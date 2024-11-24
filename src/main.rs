@@ -26,6 +26,7 @@ fn main() {
     let matches = App::new("Fstigo")
         .version("1.0.0")
         .about("Calculates pairwise Fst values between samples using alelle frequencies")
+        .author("Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>")
         .arg(
             Arg::with_name("vcf")
                 .short("v")
