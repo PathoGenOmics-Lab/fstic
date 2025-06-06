@@ -4,7 +4,7 @@
   </a>
 </p>
 
-# Fstic — Allele‑Frequency‑Based Genetic Distance Calculator
+# Fstic: Allele‑Frequency‑based Genetic distance calculator
 
 ---
 
