@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://github.com/PathoGenOmics-Lab/fstigo">
-    <img src="https://github.com/PathoGenOmics-Lab/fstigo/blob/main/.github/logos/fstic.png" height="300" alt="fstic">
+  <a href="https://github.com/PathoGenOmics-Lab/fstic">
+    <img src="https://github.com/PathoGenOmics-Lab/fstic/blob/main/.github/logos/fstic.png" height="300" alt="fstic">
   </a>
 </p>
 
