@@ -6,6 +6,12 @@
 
 # Fstic: Allele‑Frequency‑based Genetic distance calculator
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-brightgreen.svg)](https://github.com/PathoGenOmics-Lab/fstic/blob/main/LICENSE)
+[![distree](https://img.shields.io/badge/fstic-rust-%23ff8000)](https://github.com/PathoGenOmics-Lab/fstic)
+[![Anaconda-Server Badge](https://img.shields.io/conda/dn/bioconda/fstic.svg)](https://anaconda.org/bioconda/fstic)
+[![Anaconda-Version Badge](https://anaconda.org/bioconda/fstic/badges/version.svg)](https://anaconda.org/bioconda/fstic)
+[![PGO](https://img.shields.io/badge/PathoGenOmics-lab-red?)](https://github.com/PathoGenOmics-Lab)
+[![DOI](https://img.shields.io/badge/doi-10.5281%2Fzenodo.16811766-%23ff0077)](https://doi.org/10.5281/zenodo.16811766)
+
 
 __Paula Ruiz-Rodriguez<sup>1</sup>__ 
 __and Mireia Coscolla<sup>1</sup>__
@@ -33,7 +39,15 @@ Fstic is a high‑performance command‑line tool written in Rust that calculate
 ## Quick Start
 
 ```bash
-# 1. Build (requires Rust toolchain)
+# 1. Install your program:
+
+# Using conda
+conda install -c bioconda fstic
+or
+# Using mamba
+mamba install -c bioconda fstic
+or
+# Generate your binary (requires Rust toolchain)
 git clone https://github.com/<your-org>/fstic.git
 cd fstic
 cargo build --release  # binary at ./target/release/fstic
