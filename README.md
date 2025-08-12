@@ -10,7 +10,7 @@
 [![Anaconda-Server Badge](https://img.shields.io/conda/dn/bioconda/fstic.svg)](https://anaconda.org/bioconda/fstic)
 [![Anaconda-Version Badge](https://anaconda.org/bioconda/fstic/badges/version.svg)](https://anaconda.org/bioconda/fstic)
 [![PGO](https://img.shields.io/badge/PathoGenOmics-lab-red?)](https://github.com/PathoGenOmics-Lab)
-[![DOI](https://img.shields.io/badge/doi-10.5281%2Fzenodo.16811766-%23ff0077)](https://doi.org/10.5281/zenodo.16811766)
+[![DOI](https://img.shields.io/badge/doi-10.5281%2Fzenodo.16813662-%23ff0077)](https://doi.org/10.5281/zenodo.16813662)
 
 
 __Paula Ruiz-Rodriguez<sup>1</sup>__ 
