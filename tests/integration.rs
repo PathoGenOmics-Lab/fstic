@@ -173,3 +173,168 @@ fn vcf_no_reference_required() {
 
     assert!(status.success());
 }
+
+/// Indels should be skipped (only SNPs processed).
+#[test]
+fn indels_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    // Only indels, no SNPs → should fail with "no polymorphic sites"
+    write_vcf(dir.path(), "s1", &[
+        header,
+        "chr1\t100\t.\tAT\tA\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+    ]);
+    write_vcf(dir.path(), "s2", &[
+        header,
+        "chr1\t100\t.\tAT\tA\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30%",
+    ]);
+
+    let out = dir.path().join("out.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+
+    // Should fail because no SNPs remain
+    assert!(!status.success());
+}
+
+/// ALT=. and ALT=* should be skipped.
+#[test]
+fn non_variant_and_star_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "s1", &[
+        header,
+        "chr1\t100\t.\tA\t.\t.\t.\t.\tGT:DP:AD:FREQ\t0/0:100:0:0%",  // no-variant
+        "chr1\t200\t.\tA\t*\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%", // upstream del
+        "chr1\t300\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%", // real SNP
+    ]);
+    write_vcf(dir.path(), "s2", &[
+        header,
+        "chr1\t300\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30%",
+    ]);
+
+    let out = dir.path().join("out.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+
+    assert!(status.success());
+    let content = fs::read_to_string(&out).unwrap();
+    // Should have computed distances with only 1 SNP at pos 300
+    assert!(content.contains("s1"));
+}
+
+/// FREQ computed from AD/DP when FREQ field is missing.
+#[test]
+fn freq_from_ad_dp() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    // No FREQ field — should compute from AD/DP
+    write_vcf(dir.path(), "s1", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:50,50",
+    ]);
+    write_vcf(dir.path(), "s2", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:50,50",
+    ]);
+
+    let out = dir.path().join("out.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+
+    assert!(status.success());
+    let content = fs::read_to_string(&out).unwrap();
+    // Same freq → distance = 0
+    assert!(content.contains("0.000000"));
+}
+
+/// --pass-only should skip non-PASS variants.
+#[test]
+fn pass_only_filter() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "s1", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\tLowQual\t.\tGT:DP:AD:FREQ\t0/1:100:90:90%",  // filtered
+        "chr1\t200\t.\tC\tG\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",     // pass
+    ]);
+    write_vcf(dir.path(), "s2", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:10:10%",
+        "chr1\t200\t.\tC\tG\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+    ]);
+
+    let out = dir.path().join("out.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--pass-only",
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+
+    assert!(status.success());
+
+    // Now run WITHOUT --pass-only (same data)
+    let out_no_filter = dir.path().join("out_nofilt.csv");
+    let status2 = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out_no_filter.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+    assert!(status2.success());
+
+    // Distance with --pass-only should be smaller (filtered out the big diff at pos 100)
+    let content_filt = fs::read_to_string(&out).unwrap();
+    let content_nofilt = fs::read_to_string(&out_no_filter).unwrap();
+    let get_dist = |c: &str| -> f64 {
+        let lines: Vec<&str> = c.lines().collect();
+        let vals: Vec<&str> = lines[1].split(',').collect();
+        vals[2].parse().unwrap()
+    };
+    let d_filt = get_dist(&content_filt);
+    let d_nofilt = get_dist(&content_nofilt);
+    assert!(d_filt < d_nofilt, "--pass-only should reduce distance (filtered {} vs unfiltered {})", d_filt, d_nofilt);
+}

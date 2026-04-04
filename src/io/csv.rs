@@ -89,6 +89,15 @@ pub fn read_csv_files(
     (all_positions, variants_by_sample)
 }
 
+/// Quote a field if it contains the separator, a quote, or a newline.
+fn quote_field(field: &str, sep: &str) -> String {
+    if field.contains(sep) || field.contains('"') || field.contains('\n') {
+        format!("\"{}\"", field.replace('"', "\"\""))
+    } else {
+        field.to_string()
+    }
+}
+
 pub fn write_distance_matrix(
     path: &str,
     matrix: &[Vec<f64>],
@@ -101,13 +110,13 @@ pub fn write_distance_matrix(
     // Header
     write!(file, "sample")?;
     for s in samples {
-        write!(file, "{}{}", sep, s)?;
+        write!(file, "{}{}", sep, quote_field(s, sep))?;
     }
     writeln!(file)?;
 
     // Rows
     for (i, row) in matrix.iter().enumerate() {
-        write!(file, "{}", samples[i])?;
+        write!(file, "{}", quote_field(&samples[i], sep))?;
         for val in row {
             write!(file, "{}{:.6}", sep, val)?;
         }

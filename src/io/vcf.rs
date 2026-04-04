@@ -40,10 +40,16 @@ pub fn read_vcf_files(
             .or_default();
 
         let site_data = sample_map.entry(gpos).or_default();
-        site_data.reference_allele = variant.ref_allele;
+        // Only set ref_allele if not already set (avoid overwriting from duplicate lines)
+        if site_data.reference_allele.is_empty() {
+            site_data.reference_allele = variant.ref_allele;
+        }
+        // For duplicate positions: first alt wins (second line at same pos is likely
+        // an artifact from split multi-allelics or overlapping indel/SNP calls)
         site_data
             .freqs
-            .insert(variant.alt_allele, variant.alt_freq);
+            .entry(variant.alt_allele)
+            .or_insert(variant.alt_freq);
     }
 
     (all_positions, variants_by_sample)
@@ -105,9 +111,24 @@ fn parse_and_filter_vcf(
             }
         }
 
+        // Skip non-variant sites (ALT = ".")
+        if fields[4] == "." {
+            continue;
+        }
+
+        // Skip upstream deletion markers (ALT = "*")
+        if fields[4] == "*" || fields[4].contains('*') {
+            continue;
+        }
+
         // Skip multi-allelic sites with a count
         if fields[4].contains(',') {
             multi_allelic_count.fetch_add(1, Ordering::Relaxed);
+            continue;
+        }
+
+        // Skip indels: only process SNPs (single-base REF and ALT)
+        if fields[3].len() != 1 || fields[4].len() != 1 {
             continue;
         }
 
