@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>"]
 
 [dependencies]
-clap = "2.34.0"
+clap = { version = "4", features = ["derive"] }
 rayon = "1.8.1"
 indicatif = "0.17.7"
 num_cpus = "1.16.0"
