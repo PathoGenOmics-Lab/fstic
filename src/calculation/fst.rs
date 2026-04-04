@@ -3,7 +3,8 @@ use super::common::get_all_freqs_at_pos;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
-/// Calculates a cumulative FST-like metric by summing per-site Nei's GST values.
+/// Calculates FST as the sum of per-site Nei's GST: (Ht - Hs) / Ht.
+/// Note: this is a ratio-of-sums Nei GST, not Weir & Cockerham's theta.
 pub fn calculate_fst_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,

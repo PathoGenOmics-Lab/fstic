@@ -105,8 +105,8 @@ cargo build --release  # binary at ./target/release/fstic
 | Name (`--formula`) | Global Formula                                                                                                 | Notes & Recommended Use                                                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | **GST**            | \$G\_{ST} = \dfrac{H\_T - H\_S}{H\_T}\$                                                                        | Classic overall differentiation (Nei 1973).                                                                                      |
-| **FST**            | \$\theta = \dfrac{\sum\_l (H\_{T,l}-H\_{S,l})}{\sum\_l H\_{T,l}}\$ <br>*(Weir & Cockerham 1984 ratio‑of‑sums)* | Default for relative differentiation; per‑locus estimates are also available.                                                    |
-| **Jost’s D**       | \$D = \dfrac{H\_T - H\_S}{1 - H\_S}\$                                                                          | Measures the fraction of allelic diversity that is partitioned among populations; less sensitive to within‑population variation. |
+| **FST**            | \$F\_{ST} = \dfrac{\sum\_l (H\_{T,l}-H\_{S,l})}{\sum\_l H\_{T,l}}\$ <br>*(ratio‑of‑sums Nei G_ST)* | Per-locus Nei GST summed across sites (not Weir & Cockerham theta). Default for relative differentiation.                                                    |
+| **Jost’s D**       | \$D = \dfrac{n}{n-1} \cdot \dfrac{H\_T - H\_S}{1 - H\_S}\$                                                                          | Measures the fraction of allelic diversity that is partitioned among populations; less sensitive to within‑population variation. |
 
 ### Metrics for Phylogenetic / Divergence Analysis
 
