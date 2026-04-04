@@ -73,6 +73,10 @@ pub struct Args {
     #[arg(long = "min-alt-rev-reads", default_value_t = 2)]
     pub min_alt_rev_reads: u32,
 
+    /// Only keep variants that PASS all filters (VCF FILTER column).
+    #[arg(long = "pass-only")]
+    pub pass_only: bool,
+
     /// Number of worker threads (default: all available cores).
     #[arg(short = 'w', long = "workers")]
     pub workers: Option<usize>,

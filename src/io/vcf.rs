@@ -54,6 +54,7 @@ fn parse_and_filter_vcf(
     criteria: &FilterCriteria,
     multi_allelic_count: &AtomicUsize,
 ) -> Vec<VcfVariant> {
+    // Sample ID from filename (one VCF per sample is the expected input model)
     let sample_id = file
         .file_stem()
         .and_then(|s| s.to_str())
@@ -72,13 +73,36 @@ fn parse_and_filter_vcf(
 
     let mut variants = Vec::new();
     for line in reader.lines().map_while(Result::ok) {
-        if line.starts_with('#') {
+        if line.starts_with("##") {
+            continue;
+        }
+
+        // Parse #CHROM header to check for multi-sample VCFs
+        if line.starts_with("#CHROM") {
+            let cols: Vec<&str> = line.split('\t').collect();
+            if cols.len() > 10 {
+                eprintln!(
+                    "Warning: VCF file '{}' contains {} samples. \
+                     Only the first sample column will be used. \
+                     Split into per-sample VCFs for full analysis.",
+                    file.display(),
+                    cols.len() - 9
+                );
+            }
             continue;
         }
 
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.len() < 10 {
             continue;
+        }
+
+        // FILTER column check (index 6)
+        if criteria.pass_only {
+            let filter = fields[6];
+            if filter != "PASS" && filter != "." {
+                continue;
+            }
         }
 
         // Skip multi-allelic sites with a count

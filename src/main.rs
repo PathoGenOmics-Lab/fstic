@@ -28,6 +28,7 @@ fn run() -> Result<(), String> {
         min_freq: args.min_af,
         min_alt_reads: args.min_alt_reads,
         min_alt_rev_reads: args.min_alt_rev_reads,
+        pass_only: args.pass_only,
     };
 
     eprintln!("\n--- Applying Filters ---");

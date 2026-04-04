@@ -41,11 +41,18 @@ pub fn get_all_freqs_at_pos(
     if !ref_allele.is_empty() {
         all_alleles.insert(ref_allele.clone());
 
-        let sum1: f64 = freqs1.values().sum();
-        freqs1.insert(ref_allele.clone(), (1.0 - sum1).max(0.0));
+        // Only impute ref freq if the sample doesn't already have an explicit
+        // frequency for the ref allele (e.g. from table input where ref is
+        // listed as an allele with its own frequency).
+        if !freqs1.contains_key(&ref_allele) {
+            let sum1: f64 = freqs1.values().sum();
+            freqs1.insert(ref_allele.clone(), (1.0 - sum1).max(0.0));
+        }
 
-        let sum2: f64 = freqs2.values().sum();
-        freqs2.insert(ref_allele, (1.0 - sum2).max(0.0));
+        if !freqs2.contains_key(&ref_allele) {
+            let sum2: f64 = freqs2.values().sum();
+            freqs2.insert(ref_allele, (1.0 - sum2).max(0.0));
+        }
     }
 
     PairSiteFreqs {

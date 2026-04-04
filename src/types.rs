@@ -35,6 +35,7 @@ pub struct FilterCriteria {
     pub min_freq: f64,
     pub min_alt_reads: u32,
     pub min_alt_rev_reads: u32,
+    pub pass_only: bool,
 }
 
 #[derive(Debug, serde::Deserialize)]

@@ -447,4 +447,29 @@ mod tests {
         let c = std::fs::read_to_string(&out).unwrap();
         assert!(c.starts_with("sample\t"));
     }
+
+    // ── Ref imputation does not overwrite explicit freq ──────────────
+
+    #[test]
+    fn ref_imputation_no_overwrite() {
+        // If a sample explicitly has the ref allele as an alt with freq 0.7,
+        // imputation must NOT overwrite it with 1-sum.
+        let s1 = make_site("A", &[("A", 0.7), ("T", 0.3)]);
+        let s2 = make_site("A", &[("T", 0.5)]);
+        let psf = get_all_freqs_at_pos(Some(&s1), Some(&s2));
+        // s1 already has "A" in freqs → should keep 0.7, not overwrite with 1-1.0=0.0
+        assert!((psf.freqs1["A"] - 0.7).abs() < 1e-10);
+        // s2 does NOT have "A" in freqs → should impute 1-0.5=0.5
+        assert!((psf.freqs2["A"] - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn ref_imputation_normal_case() {
+        // Normal VCF case: only alt alleles in freqs, ref should be imputed
+        let s1 = make_site("A", &[("T", 0.3)]);
+        let s2 = make_site("A", &[("T", 0.6)]);
+        let psf = get_all_freqs_at_pos(Some(&s1), Some(&s2));
+        assert!((psf.freqs1["A"] - 0.7).abs() < 1e-10);
+        assert!((psf.freqs2["A"] - 0.4).abs() < 1e-10);
+    }
 }
