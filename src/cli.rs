@@ -1,3 +1,4 @@
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use rayon::ThreadPoolBuilder;
 use std::path::PathBuf;
@@ -71,31 +72,34 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn get_input_files(&self) -> Result<(InputMode, Vec<PathBuf>), String> {
+    pub fn get_input_files(&self) -> Result<(InputMode, Vec<PathBuf>)> {
         if let Some(ref files) = self.vcf {
             return Ok((InputMode::Vcf, files.clone()));
         }
         if let Some(ref list_path) = self.vcf_list {
-            let files = super::io::read_file_list(list_path.to_str().unwrap_or(""))
-                .map_err(|e| format!("Error reading VCF list file: {}", e))?;
+            let path_str = list_path.to_str().unwrap_or("");
+            let files = super::io::read_file_list(path_str)
+                .with_context(|| format!("Failed to read VCF list file: {}", path_str))?;
             return Ok((InputMode::Vcf, files));
         }
         if let Some(ref files) = self.table {
             return Ok((InputMode::Table, files.clone()));
         }
         if let Some(ref list_path) = self.table_list {
-            let files = super::io::read_file_list(list_path.to_str().unwrap_or(""))
-                .map_err(|e| format!("Error reading table list file: {}", e))?;
+            let path_str = list_path.to_str().unwrap_or("");
+            let files = super::io::read_file_list(path_str)
+                .with_context(|| format!("Failed to read table list file: {}", path_str))?;
             return Ok((InputMode::Table, files));
         }
-        Err("No input files provided. Use --vcf, --vcf-list, --table, or --table-list.".to_string())
+        bail!("No input files provided. Use --vcf, --vcf-list, --table, or --table-list.");
     }
 
-    pub fn configure_thread_pool(&self) {
+    pub fn configure_thread_pool(&self) -> Result<()> {
         let num_workers = self.workers.unwrap_or_else(num_cpus::get);
         ThreadPoolBuilder::new()
             .num_threads(num_workers)
             .build_global()
-            .unwrap();
+            .context("Failed to initialize thread pool")?;
+        Ok(())
     }
 }

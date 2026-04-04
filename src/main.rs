@@ -4,22 +4,18 @@ mod io;
 mod calculation;
 
 use crate::types::{Calculation, FilterCriteria, SiteData};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-fn main() {
+fn main() -> Result<()> {
     let args = cli::Cli::parse();
 
-    let (input_mode, files) = args.get_input_files().unwrap_or_else(|e| {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    });
+    let (input_mode, files) = args.get_input_files()?;
 
-    // Require reference for table mode
     if matches!(input_mode, cli::InputMode::Table) && args.reference.is_none() {
-        eprintln!("Error: --reference is required for table mode.");
-        std::process::exit(1);
+        bail!("--reference is required for table mode.");
     }
 
     let criteria = FilterCriteria {
@@ -48,27 +44,23 @@ fn main() {
         _ => unreachable!(),
     };
 
-    args.configure_thread_pool();
+    args.configure_thread_pool()?;
 
-    // Read reference (if provided)
     let reference_seq = if let Some(ref ref_path) = args.reference {
         println!("Reading reference FASTA...");
         let path_str = ref_path.to_str().unwrap_or("");
-        Some(io::fasta::read_reference_sequence(path_str).unwrap_or_else(|e| {
-            eprintln!("Error reading reference file {}: {}", path_str, e);
-            std::process::exit(1);
-        }))
+        Some(io::fasta::read_reference_sequence(path_str)
+            .with_context(|| format!("Failed to read reference file: {}", path_str))?)
     } else {
         None
     };
 
-    println!("Reading and processing input files...");
+    println!("Reading and processing {} input file(s)...", files.len());
     let (all_positions, mut variants_by_sample) = match input_mode {
         cli::InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria),
         cli::InputMode::Table => io::csv::read_csv_files(&files, &criteria),
     };
 
-    // FASTA fallback for reference allele if needed
     if let Some(ref ref_seq) = reference_seq {
         for pos in &all_positions {
             for sample_data in variants_by_sample.values_mut() {
@@ -82,7 +74,9 @@ fn main() {
         }
     }
 
-    println!("Found {} samples and {} polymorphic sites after filtering.", variants_by_sample.len(), all_positions.len());
+    let num_samples = variants_by_sample.len();
+    let num_loci = all_positions.len();
+    println!("Found {} samples and {} polymorphic sites after filtering.", num_samples, num_loci);
 
     let samples: Vec<String> = {
         let mut s: Vec<String> = variants_by_sample.keys().cloned().collect();
@@ -90,7 +84,7 @@ fn main() {
         s
     };
     let sample_pairs = calculation::generate_sample_pairs(&samples);
-    let num_loci = all_positions.len();
+    println!("Computing {} pairwise comparisons using {:?}...", sample_pairs.len(), args.formula);
 
     let pb = ProgressBar::new(sample_pairs.len() as u64);
     pb.set_style(
@@ -125,8 +119,9 @@ fn main() {
 
     let distance_matrix = calculation::create_distance_matrix(&results, samples.len());
     let output_str = args.output.to_str().unwrap_or("output");
-    match io::csv::write_distance_matrix(output_str, &distance_matrix, &samples) {
-        Ok(_) => println!("Distance matrix successfully written to {}", output_str),
-        Err(e) => eprintln!("Error writing output file: {}", e),
-    }
+    io::csv::write_distance_matrix(output_str, &distance_matrix, &samples)
+        .with_context(|| format!("Failed to write output file: {}", output_str))?;
+    println!("Distance matrix successfully written to {}", output_str);
+
+    Ok(())
 }

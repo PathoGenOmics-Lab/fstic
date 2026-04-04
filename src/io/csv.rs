@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn read_csv_files(
     files: &[PathBuf],
@@ -28,7 +28,6 @@ pub fn read_csv_files(
         })
         .collect();
 
-    // Apply filters to the rows from the table files
     let filtered_rows = all_rows.into_iter().filter(|row| {
         let depth_ok = row.total_dp.map_or(true, |dp| dp >= criteria.min_depth);
         let freq_ok = row.frequency >= criteria.min_freq;
@@ -49,7 +48,7 @@ pub fn read_csv_files(
         let site_data = sample_map
             .entry(row.position)
             .or_default();
-        
+
         if let Some(ref_a) = row.ref_allele {
             site_data.reference_allele = ref_a;
         }
@@ -63,12 +62,17 @@ pub fn write_distance_matrix(
     matrix: &[Vec<f64>],
     samples: &[String],
 ) -> std::io::Result<()> {
+    let delimiter = match Path::new(path).extension().and_then(OsStr::to_str) {
+        Some("csv") => ",",
+        _ => "\t",
+    };
+
     let mut file = File::create(path)?;
-    writeln!(file, "\t{}", samples.join("\t"))?;
+    writeln!(file, "{}{}", delimiter, samples.join(delimiter))?;
 
     for (i, row) in matrix.iter().enumerate() {
         let row_str: Vec<String> = row.iter().map(|v| format!("{:.6}", v)).collect();
-        writeln!(file, "{}\t{}", samples[i], row_str.join("\t"))?;
+        writeln!(file, "{}{}{}", samples[i], delimiter, row_str.join(delimiter))?;
     }
     Ok(())
 }
