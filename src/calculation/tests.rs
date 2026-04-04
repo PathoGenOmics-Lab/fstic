@@ -393,6 +393,15 @@ mod tests {
     }
 
     #[test]
+    fn fasta_softmasked_uppercase() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("ref.fa");
+        std::fs::write(&p, ">chr1\nacgt\nNNnn\n").unwrap();
+        let g = crate::io::fasta::read_reference(p.to_str().unwrap()).unwrap();
+        assert_eq!(g["chr1"], b"ACGTNNNN");
+    }
+
+    #[test]
     fn fasta_empty() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("empty.fa");
@@ -435,7 +444,7 @@ mod tests {
         crate::io::csv::write_distance_matrix(out.to_str().unwrap(), &m, &["A".into(), "B".into()], false).unwrap();
         let c = std::fs::read_to_string(&out).unwrap();
         assert!(c.starts_with("sample,"));
-        assert!(c.contains("A,0.000000,0.500000"));
+        assert!(c.contains("A,0.0000000000,0.5000000000"));
     }
 
     #[test]

@@ -5,7 +5,7 @@ mod calculation;
 
 use clap::Parser;
 use crate::cli::{Args, Formula, InputMode};
-use crate::types::{FilterCriteria, SiteData};
+use crate::types::FilterCriteria;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::process::ExitCode;
@@ -55,17 +55,21 @@ fn run() -> Result<(), String> {
     };
 
     // FASTA fallback for reference allele (chrom-aware)
+    // Only update samples that already have an entry at this position,
+    // to avoid creating phantom empty entries for every sample×position.
     if let Some(ref genome) = reference {
         for gpos in &position_set {
-            for sample_data in variants_by_sample.values_mut() {
-                let site = sample_data.entry(gpos.clone()).or_insert_with(SiteData::default);
-                if site.reference_allele.is_empty() {
-                    // Try exact chrom match first, then fall back to first contig
-                    let base = genome.get(&gpos.chrom)
-                        .and_then(|seq| seq.get(gpos.pos.saturating_sub(1)).copied())
-                        .or_else(|| io::fasta::get_base_at(genome, gpos.pos));
-                    if let Some(b) = base {
-                        site.reference_allele = String::from(b as char);
+            // Pre-compute the base once per position
+            let base = genome.get(&gpos.chrom)
+                .and_then(|seq| seq.get(gpos.pos.saturating_sub(1)).copied())
+                .or_else(|| io::fasta::get_base_at(genome, gpos.pos));
+            if let Some(b) = base {
+                let ref_str = String::from(b as char);
+                for sample_data in variants_by_sample.values_mut() {
+                    if let Some(site) = sample_data.get_mut(gpos) {
+                        if site.reference_allele.is_empty() {
+                            site.reference_allele = ref_str.clone();
+                        }
                     }
                 }
             }

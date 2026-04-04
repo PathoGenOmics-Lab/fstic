@@ -118,7 +118,9 @@ pub fn write_distance_matrix(
     for (i, row) in matrix.iter().enumerate() {
         write!(file, "{}", quote_field(&samples[i], sep))?;
         for val in row {
-            write!(file, "{}{:.6}", sep, val)?;
+            // 10 decimal places prevents rounding closely-related pairs to 0
+            // (e.g. MTB FST ~1e-8). Standard tools accept this fine.
+            write!(file, "{}{:.10}", sep, val)?;
         }
         writeln!(file)?;
     }

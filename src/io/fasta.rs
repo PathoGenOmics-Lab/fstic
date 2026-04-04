@@ -29,7 +29,8 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
             }
             current_name = header.split_whitespace().next().unwrap_or("").to_string();
         } else {
-            current_seq.extend_from_slice(trimmed.as_bytes());
+            // Uppercase to handle soft-masked references
+            current_seq.extend(trimmed.bytes().map(|b| b.to_ascii_uppercase()));
         }
     }
     if !current_name.is_empty() {
