@@ -71,6 +71,41 @@ fn run() -> Result<(), String> {
         }
     }
 
+    // Check for inconsistent reference alleles across samples at the same position
+    {
+        let mut ref_alleles_by_pos: std::collections::HashMap<&types::GenomicPos, String> = std::collections::HashMap::new();
+        let mut inconsistent_count = 0usize;
+        for sample_data in variants_by_sample.values() {
+            for (gpos, site) in sample_data {
+                if site.reference_allele.is_empty() {
+                    continue;
+                }
+                match ref_alleles_by_pos.get(gpos) {
+                    Some(prev_ref) if *prev_ref != site.reference_allele => {
+                        if inconsistent_count == 0 {
+                            eprintln!(
+                                "Warning: inconsistent REF alleles at {}:{} ('{}' vs '{}'). \
+                                 Check that all VCFs were called against the same reference.",
+                                gpos.chrom, gpos.pos, prev_ref, site.reference_allele
+                            );
+                        }
+                        inconsistent_count += 1;
+                    }
+                    None => {
+                        ref_alleles_by_pos.insert(gpos, site.reference_allele.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if inconsistent_count > 0 {
+            eprintln!(
+                "Warning: {} position(s) have inconsistent REF alleles across samples.",
+                inconsistent_count
+            );
+        }
+    }
+
     if variants_by_sample.is_empty() {
         return Err("No samples found after filtering. Check input files and filter thresholds.".to_string());
     }

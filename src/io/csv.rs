@@ -55,7 +55,11 @@ pub fn read_csv_files(
         );
     }
 
-    let filtered_rows = all_rows.into_iter().filter(|row| {
+    let filtered_rows: Vec<TableInputRow> = all_rows.into_iter().filter(|row| {
+        // Validate frequency range
+        if !row.frequency.is_finite() || !(0.0..=1.0).contains(&row.frequency) {
+            return false;
+        }
         let depth_ok = row.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
         let freq_ok = row.frequency >= criteria.min_freq;
         let alt_reads_ok = row.alt_dp.is_none_or(|ad| ad >= criteria.min_alt_reads);
@@ -63,7 +67,7 @@ pub fn read_csv_files(
             .alt_rv
             .is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
         depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
-    });
+    }).collect();
 
     let mut variants_by_sample: SampleVariants = HashMap::new();
     let mut all_positions: HashSet<GenomicPos> = HashSet::new();

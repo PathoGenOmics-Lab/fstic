@@ -43,7 +43,7 @@ pub fn read_vcf_files(
         site_data.reference_allele = variant.ref_allele;
         site_data
             .freqs
-            .insert(variant.alt_allele, variant.alt_freq.unwrap_or(0.0));
+            .insert(variant.alt_allele, variant.alt_freq);
     }
 
     (all_positions, variants_by_sample)
@@ -96,7 +96,7 @@ fn parse_and_filter_vcf(
         .into_iter()
         .filter(|v| {
             let depth_ok = v.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
-            let freq_ok = v.alt_freq.is_none_or(|freq| freq >= criteria.min_freq);
+            let freq_ok = v.alt_freq >= criteria.min_freq;
             let alt_reads_ok = v.alt_dp.is_none_or(|ad| ad >= criteria.min_alt_reads);
             let alt_rev_reads_ok = v
                 .alt_rv
@@ -172,16 +172,21 @@ fn parse_vcf_line(
 
     let alt_rv = parse_int_warn("ADR", warned);
 
-    // FREQ: handle both proportion (0.5) and percentage (50%)
+    // FREQ: handle proportion (0.5), percentage (50%), or compute from AD/DP
     let alt_freq = match get_value("FREQ") {
         "." => {
             if warned.insert("FREQ".to_string()) {
                 eprintln!(
-                    "Warning: VCF file '{}' is missing FORMAT field 'FREQ'.",
+                    "Warning: VCF file '{}' is missing FORMAT field 'FREQ'. \
+                     Will compute from AD/DP when available.",
                     filepath.display()
                 );
             }
-            None
+            // Compute from AD/DP if available
+            match (alt_dp, total_dp) {
+                (Some(ad), Some(dp)) if dp > 0 => Some(ad as f64 / dp as f64),
+                _ => None,
+            }
         }
         val => {
             let parsed = if val.ends_with('%') {
@@ -207,6 +212,10 @@ fn parse_vcf_line(
         }
     };
 
+    // If freq is still None after all attempts, skip this variant entirely
+    // (we cannot compute distances without knowing the allele frequency)
+    let alt_freq = alt_freq?;
+
     Some(VcfVariant {
         sample: sample_id.to_string(),
         chrom,
@@ -215,7 +224,7 @@ fn parse_vcf_line(
         alt_allele: fields[4].to_string(),
         total_dp,
         alt_dp,
-        alt_freq,
+        alt_freq,  // guaranteed non-None by the ? above
         alt_rv,
     })
 }

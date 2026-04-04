@@ -25,7 +25,7 @@ pub struct VcfVariant {
     pub alt_allele: String,
     pub total_dp: Option<u32>,
     pub alt_dp: Option<u32>,
-    pub alt_freq: Option<f64>,
+    pub alt_freq: f64,
     pub alt_rv: Option<u32>,
 }
 
