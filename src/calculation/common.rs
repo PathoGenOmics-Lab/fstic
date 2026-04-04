@@ -63,6 +63,7 @@ pub fn heterozygosity(freqs: &AlleleFrequencies) -> f64 {
 
 /// Homozygosity for a frequency map: `sum(p_i^2)`.
 #[inline]
+#[allow(dead_code)]
 pub fn homozygosity(freqs: &AlleleFrequencies) -> f64 {
     freqs.values().map(|p| p.powi(2)).sum::<f64>()
 }

@@ -8,14 +8,12 @@ use crate::cli::{Args, Formula, InputMode};
 use crate::types::{Calculation, FilterCriteria, SiteData};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use std::process::ExitCode;
 
-fn main() {
+fn run() -> Result<(), String> {
     let args = Args::parse();
 
-    let (input_mode, files) = args.get_input_files().unwrap_or_else(|e| {
-        eprintln!("{}", e);
-        std::process::exit(1);
-    });
+    let (input_mode, files) = args.get_input_files()?;
 
     let criteria = FilterCriteria {
         min_depth: args.min_depth,
@@ -24,7 +22,6 @@ fn main() {
         min_alt_rev_reads: args.min_alt_rev_reads,
     };
 
-    // Inform user about applied filters
     eprintln!("\n--- Applying Filters ---");
     eprintln!("> Minimum Depth (DP): {}", criteria.min_depth);
     eprintln!("> Minimum Allele Freq (AF): {}", criteria.min_freq);
@@ -46,13 +43,11 @@ fn main() {
     args.configure_thread_pool();
 
     // Read reference if provided
-    let reference_seq = args.reference.as_ref().map(|path| {
+    let reference = args.reference.as_ref().map(|path| {
+        let path_str = path.to_str().unwrap_or_default();
         eprintln!("Reading reference FASTA...");
-        io::fasta::read_reference_sequence(path.to_str().unwrap_or_default()).unwrap_or_else(|e| {
-            eprintln!("Error reading reference file: {}", e);
-            std::process::exit(1);
-        })
-    });
+        io::fasta::read_reference(path_str)
+    }).transpose().map_err(|e| format!("Reference error: {}", e))?;
 
     // Read input files
     eprintln!("Reading and processing input files...");
@@ -62,17 +57,25 @@ fn main() {
     };
 
     // FASTA fallback for reference allele (only when reference is provided)
-    if let Some(ref ref_seq) = reference_seq {
+    if let Some(ref genome) = reference {
         for pos in &all_positions {
             for sample_data in variants_by_sample.values_mut() {
                 let site = sample_data.entry(*pos).or_insert_with(SiteData::default);
                 if site.reference_allele.is_empty() {
-                    if let Some(ref_char) = ref_seq.get(pos - 1) {
-                        site.reference_allele = ref_char.to_string();
+                    if let Some(base) = io::fasta::get_base_at(genome, *pos) {
+                        site.reference_allele = String::from(base as char);
                     }
                 }
             }
         }
+    }
+
+    if variants_by_sample.is_empty() {
+        return Err("No samples found after filtering. Check input files and filter thresholds.".to_string());
+    }
+
+    if all_positions.is_empty() {
+        return Err("No polymorphic sites found after filtering.".to_string());
     }
 
     eprintln!(
@@ -89,9 +92,12 @@ fn main() {
     };
     let sample_pairs = calculation::generate_sample_pairs(&samples);
 
-    // Pairwise calculations
+    if sample_pairs.is_empty() {
+        return Err("Need at least 2 samples for pairwise distance calculation.".to_string());
+    }
+
     let num_loci = all_positions.len();
-    let output_path_str = args.output.to_str().unwrap_or("output");
+    let output_path_str = args.output.to_str().ok_or("Invalid output path")?;
 
     eprintln!(
         "Computing {} distances for {} pairs...",
@@ -133,15 +139,21 @@ fn main() {
 
     // Write output
     let distance_matrix = calculation::create_distance_matrix(&results, samples.len());
-
-    // Auto-detect output delimiter from extension
     let use_tab = output_path_str.ends_with(".tsv") || output_path_str.ends_with(".tab");
 
-    match io::csv::write_distance_matrix(output_path_str, &distance_matrix, &samples, use_tab) {
-        Ok(_) => eprintln!("Distance matrix written to {}", output_path_str),
+    io::csv::write_distance_matrix(output_path_str, &distance_matrix, &samples, use_tab)
+        .map_err(|e| format!("Error writing output: {}", e))?;
+
+    eprintln!("Distance matrix written to {}", output_path_str);
+    Ok(())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("Error writing output file: {}", e);
-            std::process::exit(1);
+            eprintln!("Error: {}", e);
+            ExitCode::FAILURE
         }
     }
 }
