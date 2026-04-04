@@ -1,7 +1,6 @@
 use super::common::{get_all_freqs_at_pos, heterozygosity, pooled_heterozygosity};
 use crate::types::PositionalData;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// Number of sub-populations (always 2 for pairwise comparison).
 const N_POPS: f64 = 2.0;
@@ -17,7 +16,7 @@ const N_POPS: f64 = 2.0;
 pub fn calculate_jost_d_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[usize],
     normalize: bool,
     num_loci: usize,
 ) -> f64 {

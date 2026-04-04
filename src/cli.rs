@@ -119,9 +119,9 @@ impl Args {
     /// Configure the global rayon thread pool.
     pub fn configure_thread_pool(&self) {
         let num_workers = self.workers.unwrap_or_else(num_cpus::get);
-        ThreadPoolBuilder::new()
+        // Silently ignore if already initialized (e.g., in tests)
+        let _ = ThreadPoolBuilder::new()
             .num_threads(num_workers)
-            .build_global()
-            .unwrap();
+            .build_global();
     }
 }

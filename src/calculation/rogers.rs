@@ -1,7 +1,6 @@
 use super::common::get_all_freqs_at_pos;
 use crate::types::PositionalData;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// Calculates Rogers' distance (1972): D_R = √(Σ(p_i − q_i)² / 2L).
 ///
@@ -9,7 +8,7 @@ use std::collections::HashSet;
 pub fn calculate_rogers_distance_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[usize],
     num_loci: usize,
 ) -> f64 {
     if num_loci == 0 {

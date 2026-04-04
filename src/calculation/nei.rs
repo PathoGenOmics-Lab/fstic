@@ -1,7 +1,6 @@
 use super::common::get_all_freqs_at_pos;
 use crate::types::PositionalData;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// Calculates Nei's standard genetic distance: D = −ln(I).
 ///
@@ -10,7 +9,7 @@ use std::collections::HashSet;
 pub fn calculate_nei_distance_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[usize],
 ) -> f64 {
     let (j_xy, j_x, j_y) = all_positions
         .par_iter()

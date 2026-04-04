@@ -1,7 +1,6 @@
 use super::common::get_all_freqs_at_pos;
 use crate::types::PositionalData;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// Calculates Bray-Curtis dissimilarity: BC = 0.5 Σ |p_i − q_i|.
 ///
@@ -10,7 +9,7 @@ use std::collections::HashSet;
 pub fn calculate_bray_curtis_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[usize],
     normalize: bool,
     num_loci: usize,
 ) -> f64 {

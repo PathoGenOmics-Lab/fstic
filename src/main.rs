@@ -5,15 +5,24 @@ mod calculation;
 
 use clap::Parser;
 use crate::cli::{Args, Formula, InputMode};
-use crate::types::{Calculation, FilterCriteria, SiteData};
+use crate::types::{FilterCriteria, SiteData};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::process::ExitCode;
+use std::time::Instant;
 
 fn run() -> Result<(), String> {
     let args = Args::parse();
+    let start = Instant::now();
 
     let (input_mode, files) = args.get_input_files()?;
+
+    // Validate input files exist
+    for f in &files {
+        if !f.exists() {
+            return Err(format!("Input file not found: {}", f.display()));
+        }
+    }
 
     let criteria = FilterCriteria {
         min_depth: args.min_depth,
@@ -29,17 +38,6 @@ fn run() -> Result<(), String> {
     eprintln!("> Minimum Alt. Reverse Reads (ADR): {}", criteria.min_alt_rev_reads);
     eprintln!("------------------------\n");
 
-    let formula = match args.formula {
-        Formula::Fst => Calculation::Fst,
-        Formula::Gst => Calculation::Gst,
-        Formula::Nei => Calculation::Nei,
-        Formula::Chord => Calculation::Chord,
-        Formula::BrayCurtis => Calculation::BrayCurtis,
-        Formula::JostD => Calculation::JostD,
-        Formula::Reynolds => Calculation::Reynolds,
-        Formula::Rogers => Calculation::Rogers,
-    };
-
     args.configure_thread_pool();
 
     // Read reference if provided
@@ -50,15 +48,15 @@ fn run() -> Result<(), String> {
     }).transpose().map_err(|e| format!("Reference error: {}", e))?;
 
     // Read input files
-    eprintln!("Reading and processing input files...");
-    let (all_positions, mut variants_by_sample) = match input_mode {
+    eprintln!("Reading {} input files...", files.len());
+    let (position_set, mut variants_by_sample) = match input_mode {
         InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria),
         InputMode::Table => io::csv::read_csv_files(&files, &criteria),
     };
 
     // FASTA fallback for reference allele (only when reference is provided)
     if let Some(ref genome) = reference {
-        for pos in &all_positions {
+        for pos in &position_set {
             for sample_data in variants_by_sample.values_mut() {
                 let site = sample_data.entry(*pos).or_insert_with(SiteData::default);
                 if site.reference_allele.is_empty() {
@@ -74,14 +72,23 @@ fn run() -> Result<(), String> {
         return Err("No samples found after filtering. Check input files and filter thresholds.".to_string());
     }
 
-    if all_positions.is_empty() {
+    if position_set.is_empty() {
         return Err("No polymorphic sites found after filtering.".to_string());
     }
+
+    // Sort positions for deterministic iteration and cache-friendly access
+    let all_positions: Vec<usize> = {
+        let mut v: Vec<usize> = position_set.into_iter().collect();
+        v.sort_unstable();
+        v
+    };
+
+    let num_loci = all_positions.len();
 
     eprintln!(
         "Found {} samples and {} polymorphic sites after filtering.",
         variants_by_sample.len(),
-        all_positions.len()
+        num_loci
     );
 
     // Prepare for calculation
@@ -96,12 +103,13 @@ fn run() -> Result<(), String> {
         return Err("Need at least 2 samples for pairwise distance calculation.".to_string());
     }
 
-    let num_loci = all_positions.len();
     let output_path_str = args.output.to_str().ok_or("Invalid output path")?;
+    let formula = args.formula;
+    let normalize = args.normalize;
 
     eprintln!(
-        "Computing {} distances for {} pairs...",
-        format!("{:?}", args.formula).to_lowercase(),
+        "Computing {:?} distances for {} pairs...",
+        formula,
         sample_pairs.len()
     );
 
@@ -118,17 +126,16 @@ fn run() -> Result<(), String> {
         .map(|&(i, j)| {
             let data1 = variants_by_sample.get(&samples[i]).unwrap();
             let data2 = variants_by_sample.get(&samples[j]).unwrap();
-            let normalize = args.normalize;
 
             let dist = match formula {
-                Calculation::Fst => calculation::fst::calculate_fst_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Calculation::Gst => calculation::gst::calculate_gst_for_pair(data1, data2, &all_positions),
-                Calculation::Nei => calculation::nei::calculate_nei_distance_for_pair(data1, data2, &all_positions),
-                Calculation::Chord => calculation::chord::calculate_chord_distance_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Calculation::BrayCurtis => calculation::bray_curtis::calculate_bray_curtis_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Calculation::JostD => calculation::jost_d::calculate_jost_d_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Calculation::Reynolds => calculation::reynolds::calculate_reynolds_distance_for_pair(data1, data2, &all_positions),
-                Calculation::Rogers => calculation::rogers::calculate_rogers_distance_for_pair(data1, data2, &all_positions, num_loci),
+                Formula::Fst => calculation::fst::calculate_fst_for_pair(data1, data2, &all_positions, normalize, num_loci),
+                Formula::Gst => calculation::gst::calculate_gst_for_pair(data1, data2, &all_positions),
+                Formula::Nei => calculation::nei::calculate_nei_distance_for_pair(data1, data2, &all_positions),
+                Formula::Chord => calculation::chord::calculate_chord_distance_for_pair(data1, data2, &all_positions, normalize, num_loci),
+                Formula::BrayCurtis => calculation::bray_curtis::calculate_bray_curtis_for_pair(data1, data2, &all_positions, normalize, num_loci),
+                Formula::JostD => calculation::jost_d::calculate_jost_d_for_pair(data1, data2, &all_positions, normalize, num_loci),
+                Formula::Reynolds => calculation::reynolds::calculate_reynolds_distance_for_pair(data1, data2, &all_positions),
+                Formula::Rogers => calculation::rogers::calculate_rogers_distance_for_pair(data1, data2, &all_positions, num_loci),
             };
             pb.inc(1);
             ((i, j), dist)
@@ -144,7 +151,24 @@ fn run() -> Result<(), String> {
     io::csv::write_distance_matrix(output_path_str, &distance_matrix, &samples, use_tab)
         .map_err(|e| format!("Error writing output: {}", e))?;
 
-    eprintln!("Distance matrix written to {}", output_path_str);
+    let elapsed = start.elapsed();
+    eprintln!(
+        "\n--- Summary ---\n\
+         > Samples: {}\n\
+         > Loci: {}\n\
+         > Pairs: {}\n\
+         > Formula: {:?}\n\
+         > Output: {}\n\
+         > Time: {:.2}s\n\
+         ---------------",
+        samples.len(),
+        num_loci,
+        sample_pairs.len(),
+        formula,
+        output_path_str,
+        elapsed.as_secs_f64()
+    );
+
     Ok(())
 }
 

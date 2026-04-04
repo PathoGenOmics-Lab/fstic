@@ -1,7 +1,6 @@
 use super::common::{get_all_freqs_at_pos, heterozygosity, pooled_heterozygosity};
 use crate::types::PositionalData;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// Calculates FST as sum-of-per-site Nei's GST: Σ (Ht - Hs) / Ht.
 ///
@@ -10,7 +9,7 @@ use std::collections::HashSet;
 pub fn calculate_fst_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[usize],
     normalize: bool,
     num_loci: usize,
 ) -> f64 {

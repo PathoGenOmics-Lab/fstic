@@ -6,23 +6,9 @@ pub struct SiteData {
     pub freqs: AlleleFrequencies,
 }
 
-pub type Position = usize;
-pub type Allele = String;
-pub type Frequency = f64;
-pub type AlleleFrequencies = HashMap<Allele, Frequency>;
-pub type PositionalData = HashMap<Position, SiteData>;
+pub type AlleleFrequencies = HashMap<String, f64>;
+pub type PositionalData = HashMap<usize, SiteData>;
 pub type SampleVariants = HashMap<String, PositionalData>;
-
-pub enum Calculation {
-    Fst,
-    Gst,
-    Nei,
-    Chord,
-    BrayCurtis,
-    JostD,
-    Reynolds,
-    Rogers,
-}
 
 pub struct VcfVariant {
     pub sample: String,

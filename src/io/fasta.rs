@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind};
 
-/// Reference genome: contig name → sequence bytes.
-pub type ReferenceGenome = HashMap<String, Vec<u8>>;
+/// Reference genome: contig name → sequence bytes (sorted by name for determinism).
+pub type ReferenceGenome = BTreeMap<String, Vec<u8>>;
 
 /// Reads a multi-contig reference FASTA file into a name→sequence map.
 ///
@@ -25,8 +25,7 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
         }
         if let Some(header) = trimmed.strip_prefix('>') {
             if !current_name.is_empty() {
-                genome.insert(current_name.clone(), current_seq.clone());
-                current_seq.clear();
+                genome.insert(std::mem::take(&mut current_name), std::mem::take(&mut current_seq));
             }
             current_name = header.split_whitespace().next().unwrap_or("").to_string();
         } else {
@@ -44,10 +43,10 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
     Ok(genome)
 }
 
-/// Gets a base at 1-based position from the first (or only) contig.
+/// Gets a base at 1-based position from the first (lexicographically) contig.
 ///
-/// Convenience for single-contig references used in VCF mode.
+/// Deterministic because `BTreeMap` iterates in sorted key order.
+/// Suitable for single-contig references used in VCF mode.
 pub fn get_base_at(genome: &ReferenceGenome, pos: usize) -> Option<u8> {
-    // Try the first contig (most common case: single-contig reference)
     genome.values().next().and_then(|seq| seq.get(pos.saturating_sub(1)).copied())
 }

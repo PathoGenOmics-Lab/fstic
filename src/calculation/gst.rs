@@ -1,7 +1,6 @@
 use super::common::{get_all_freqs_at_pos, heterozygosity, pooled_heterozygosity};
 use crate::types::PositionalData;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// Calculates Nei's global GST as ratio-of-sums: Σ(Ht - Hs) / Σ(Ht).
 ///
@@ -11,7 +10,7 @@ use std::collections::HashSet;
 pub fn calculate_gst_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[usize],
 ) -> f64 {
     let (total_num, total_den) = all_positions
         .par_iter()
