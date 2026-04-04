@@ -1,4 +1,4 @@
-use crate::types::{FilterCriteria, SampleVariants, VcfVariant};
+use crate::types::{FilterCriteria, GenomicPos, SampleVariants, VcfVariant};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub fn read_vcf_files(
     files: &[PathBuf],
     criteria: &FilterCriteria,
-) -> (HashSet<usize>, SampleVariants) {
+) -> (HashSet<GenomicPos>, SampleVariants) {
     let multi_allelic_count = AtomicUsize::new(0);
 
     let all_variants: Vec<VcfVariant> = files
@@ -27,15 +27,19 @@ pub fn read_vcf_files(
     }
 
     let mut variants_by_sample: SampleVariants = HashMap::new();
-    let mut all_positions: HashSet<usize> = HashSet::new();
+    let mut all_positions: HashSet<GenomicPos> = HashSet::new();
 
     for variant in all_variants {
-        all_positions.insert(variant.pos);
+        let gpos = GenomicPos {
+            chrom: variant.chrom.clone(),
+            pos: variant.pos,
+        };
+        all_positions.insert(gpos.clone());
         let sample_map = variants_by_sample
             .entry(variant.sample.clone())
             .or_default();
 
-        let site_data = sample_map.entry(variant.pos).or_default();
+        let site_data = sample_map.entry(gpos).or_default();
         site_data.reference_allele = variant.ref_allele;
         site_data
             .freqs
@@ -108,6 +112,7 @@ fn parse_vcf_line(
     filepath: &Path,
     warned: &mut HashSet<String>,
 ) -> Option<VcfVariant> {
+    let chrom = fields[0].to_string();
     let pos = fields[1].parse::<usize>().ok()?;
     let ref_allele = fields[3].to_string();
 
@@ -121,7 +126,7 @@ fn parse_vcf_line(
 
     let get_value = |key: &str| -> &str { format_map.get(key).copied().unwrap_or(".") };
 
-    let parse_and_warn = |key: &str, warned: &mut HashSet<String>| -> Option<u32> {
+    let parse_int_warn = |key: &str, warned: &mut HashSet<String>| -> Option<u32> {
         match get_value(key) {
             "." => {
                 if warned.insert(key.to_string()) {
@@ -138,11 +143,36 @@ fn parse_vcf_line(
         }
     };
 
-    let total_dp = parse_and_warn("DP", warned);
-    let alt_dp = parse_and_warn("AD", warned);
-    let alt_rv = parse_and_warn("ADR", warned);
+    let total_dp = parse_int_warn("DP", warned);
 
-    // FIX: only divide by 100 when the raw value actually contains '%'
+    // AD field: VCF spec uses comma-separated "ref_depth,alt_depth[,alt2_depth,...]"
+    // VarScan uses a single integer for alt reads only.
+    // Handle both formats.
+    let alt_dp = match get_value("AD") {
+        "." => {
+            if warned.insert("AD".to_string()) {
+                eprintln!(
+                    "Warning: VCF file '{}' is missing FORMAT field 'AD'. \
+                     Filtering on this field will be skipped.",
+                    filepath.display(),
+                );
+            }
+            None
+        }
+        val => {
+            if val.contains(',') {
+                // Standard VCF: AD=ref,alt — take the second value (alt depth)
+                val.split(',').nth(1).and_then(|s| s.parse::<u32>().ok())
+            } else {
+                // VarScan style: AD=alt_reads (single integer)
+                val.parse::<u32>().ok()
+            }
+        }
+    };
+
+    let alt_rv = parse_int_warn("ADR", warned);
+
+    // FREQ: handle both proportion (0.5) and percentage (50%)
     let alt_freq = match get_value("FREQ") {
         "." => {
             if warned.insert("FREQ".to_string()) {
@@ -154,19 +184,32 @@ fn parse_vcf_line(
             None
         }
         val => {
-            if val.ends_with('%') {
+            let parsed = if val.ends_with('%') {
                 val.trim_end_matches('%')
                     .parse::<f64>()
                     .ok()
                     .map(|f| f / 100.0)
             } else {
                 val.parse::<f64>().ok()
-            }
+            };
+            // Validate range
+            parsed.and_then(|f| {
+                if f.is_finite() && (0.0..=1.0).contains(&f) {
+                    Some(f)
+                } else {
+                    eprintln!(
+                        "Warning: VCF file '{}' pos {} has out-of-range FREQ={} (expected 0-1). Skipping site.",
+                        filepath.display(), pos, f
+                    );
+                    None
+                }
+            })
         }
     };
 
     Some(VcfVariant {
         sample: sample_id.to_string(),
+        chrom,
         pos,
         ref_allele,
         alt_allele: fields[4].to_string(),

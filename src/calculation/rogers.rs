@@ -1,5 +1,5 @@
 use super::common::get_all_freqs_at_pos;
-use crate::types::PositionalData;
+use crate::types::{GenomicPos, PositionalData};
 use rayon::prelude::*;
 
 /// Calculates Rogers' distance (1972): D_R = √(Σ(p_i − q_i)² / 2L).
@@ -8,25 +8,20 @@ use rayon::prelude::*;
 pub fn calculate_rogers_distance_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &[usize],
+    all_positions: &[GenomicPos],
     num_loci: usize,
 ) -> f64 {
-    if num_loci == 0 {
-        return 0.0;
-    }
+    if num_loci == 0 { return 0.0; }
 
     let total_sum_sq: f64 = all_positions
         .par_iter()
-        .map(|&pos| {
-            let psf = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
-            psf.all_alleles
-                .iter()
-                .map(|a| {
-                    let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
-                    let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
-                    (p - q).powi(2)
-                })
-                .sum::<f64>()
+        .map(|pos| {
+            let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
+            psf.all_alleles.iter().map(|a| {
+                let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+                let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+                (p - q).powi(2)
+            }).sum::<f64>()
         })
         .sum();
 

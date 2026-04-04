@@ -1,5 +1,5 @@
 use super::common::get_all_freqs_at_pos;
-use crate::types::PositionalData;
+use crate::types::{GenomicPos, PositionalData};
 use rayon::prelude::*;
 
 /// Calculates Nei's standard genetic distance: D = −ln(I).
@@ -9,12 +9,12 @@ use rayon::prelude::*;
 pub fn calculate_nei_distance_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &[usize],
+    all_positions: &[GenomicPos],
 ) -> f64 {
     let (j_xy, j_x, j_y) = all_positions
         .par_iter()
-        .map(|&pos| {
-            let psf = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
+        .map(|pos| {
+            let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
             let mut sxy = 0.0_f64;
             let mut sx = 0.0_f64;
             let mut sy = 0.0_f64;
@@ -32,11 +32,7 @@ pub fn calculate_nei_distance_for_pair(
     let denom = (j_x * j_y).sqrt();
     if denom > 0.0 {
         let identity = j_xy / denom;
-        if identity > 0.0 {
-            -identity.ln()
-        } else {
-            f64::INFINITY
-        }
+        if identity > 0.0 { -identity.ln() } else { f64::INFINITY }
     } else {
         f64::INFINITY
     }

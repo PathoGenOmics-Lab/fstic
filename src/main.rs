@@ -17,7 +17,6 @@ fn run() -> Result<(), String> {
 
     let (input_mode, files) = args.get_input_files()?;
 
-    // Validate input files exist
     for f in &files {
         if !f.exists() {
             return Err(format!("Input file not found: {}", f.display()));
@@ -54,14 +53,18 @@ fn run() -> Result<(), String> {
         InputMode::Table => io::csv::read_csv_files(&files, &criteria),
     };
 
-    // FASTA fallback for reference allele (only when reference is provided)
+    // FASTA fallback for reference allele (chrom-aware)
     if let Some(ref genome) = reference {
-        for pos in &position_set {
+        for gpos in &position_set {
             for sample_data in variants_by_sample.values_mut() {
-                let site = sample_data.entry(*pos).or_insert_with(SiteData::default);
+                let site = sample_data.entry(gpos.clone()).or_insert_with(SiteData::default);
                 if site.reference_allele.is_empty() {
-                    if let Some(base) = io::fasta::get_base_at(genome, *pos) {
-                        site.reference_allele = String::from(base as char);
+                    // Try exact chrom match first, then fall back to first contig
+                    let base = genome.get(&gpos.chrom)
+                        .and_then(|seq| seq.get(gpos.pos.saturating_sub(1)).copied())
+                        .or_else(|| io::fasta::get_base_at(genome, gpos.pos));
+                    if let Some(b) = base {
+                        site.reference_allele = String::from(b as char);
                     }
                 }
             }
@@ -76,10 +79,10 @@ fn run() -> Result<(), String> {
         return Err("No polymorphic sites found after filtering.".to_string());
     }
 
-    // Sort positions for deterministic iteration and cache-friendly access
-    let all_positions: Vec<usize> = {
-        let mut v: Vec<usize> = position_set.into_iter().collect();
-        v.sort_unstable();
+    // Sort positions for deterministic iteration
+    let all_positions: Vec<types::GenomicPos> = {
+        let mut v: Vec<_> = position_set.into_iter().collect();
+        v.sort();
         v
     };
 
@@ -91,7 +94,6 @@ fn run() -> Result<(), String> {
         num_loci
     );
 
-    // Prepare for calculation
     let samples: Vec<String> = {
         let mut s: Vec<String> = variants_by_sample.keys().cloned().collect();
         s.sort();
@@ -144,7 +146,6 @@ fn run() -> Result<(), String> {
 
     pb.finish_with_message("Calculation complete.");
 
-    // Write output
     let distance_matrix = calculation::create_distance_matrix(&results, samples.len());
     let use_tab = output_path_str.ends_with(".tsv") || output_path_str.ends_with(".tab");
 
@@ -161,12 +162,7 @@ fn run() -> Result<(), String> {
          > Output: {}\n\
          > Time: {:.2}s\n\
          ---------------",
-        samples.len(),
-        num_loci,
-        sample_pairs.len(),
-        formula,
-        output_path_str,
-        elapsed.as_secs_f64()
+        samples.len(), num_loci, sample_pairs.len(), formula, output_path_str, elapsed.as_secs_f64()
     );
 
     Ok(())

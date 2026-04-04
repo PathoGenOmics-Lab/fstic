@@ -1,15 +1,18 @@
-use crate::types::{FilterCriteria, SampleVariants, TableInputRow};
+use crate::types::{FilterCriteria, GenomicPos, SampleVariants, TableInputRow};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn read_csv_files(
     files: &[PathBuf],
     criteria: &FilterCriteria,
-) -> (HashSet<usize>, SampleVariants) {
+) -> (HashSet<GenomicPos>, SampleVariants) {
+    let error_count = AtomicUsize::new(0);
+
     let all_rows: Vec<TableInputRow> = files
         .par_iter()
         .flat_map(|file| {
@@ -24,10 +27,18 @@ pub fn read_csv_files(
                 .from_path(file);
 
             match rdr {
-                Ok(mut reader) => reader
-                    .deserialize()
-                    .filter_map(Result::ok)
-                    .collect::<Vec<TableInputRow>>(),
+                Ok(mut reader) => {
+                    let mut rows = Vec::new();
+                    for result in reader.deserialize() {
+                        match result {
+                            Ok(row) => rows.push(row),
+                            Err(_) => {
+                                error_count.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                    }
+                    rows
+                }
                 Err(e) => {
                     eprintln!("Error: cannot open table file {}: {}", file.display(), e);
                     Vec::new()
@@ -35,6 +46,14 @@ pub fn read_csv_files(
             }
         })
         .collect();
+
+    let skipped = error_count.load(Ordering::Relaxed);
+    if skipped > 0 {
+        eprintln!(
+            "Warning: skipped {} malformed row(s) in table input.",
+            skipped
+        );
+    }
 
     let filtered_rows = all_rows.into_iter().filter(|row| {
         let depth_ok = row.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
@@ -47,12 +66,16 @@ pub fn read_csv_files(
     });
 
     let mut variants_by_sample: SampleVariants = HashMap::new();
-    let mut all_positions: HashSet<usize> = HashSet::new();
+    let mut all_positions: HashSet<GenomicPos> = HashSet::new();
 
     for row in filtered_rows {
-        all_positions.insert(row.position);
+        let gpos = GenomicPos {
+            chrom: row.chrom,
+            pos: row.position,
+        };
+        all_positions.insert(gpos.clone());
         let sample_map = variants_by_sample.entry(row.sample).or_default();
-        let site_data = sample_map.entry(row.position).or_default();
+        let site_data = sample_map.entry(gpos).or_default();
 
         if let Some(ref_a) = row.ref_allele {
             site_data.reference_allele = ref_a;
