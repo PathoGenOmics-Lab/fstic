@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub fn read_csv_files(
     files: &[PathBuf],
@@ -18,21 +18,31 @@ pub fn read_csv_files(
                 _ => b',',
             };
 
-            let mut rdr = csv::ReaderBuilder::new()
+            let rdr = csv::ReaderBuilder::new()
                 .flexible(true)
                 .delimiter(delimiter)
-                .from_path(file)
-                .expect("Cannot open input table file");
+                .from_path(file);
 
-            rdr.deserialize().filter_map(Result::ok).collect::<Vec<_>>()
+            match rdr {
+                Ok(mut reader) => reader
+                    .deserialize()
+                    .filter_map(Result::ok)
+                    .collect::<Vec<TableInputRow>>(),
+                Err(e) => {
+                    eprintln!("Error: cannot open table file {}: {}", file.display(), e);
+                    Vec::new()
+                }
+            }
         })
         .collect();
 
     let filtered_rows = all_rows.into_iter().filter(|row| {
-        let depth_ok = row.total_dp.map_or(true, |dp| dp >= criteria.min_depth);
+        let depth_ok = row.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
         let freq_ok = row.frequency >= criteria.min_freq;
-        let alt_reads_ok = row.alt_dp.map_or(true, |ad| ad >= criteria.min_alt_reads);
-        let alt_rev_reads_ok = row.alt_rv.map_or(true, |arv| arv >= criteria.min_alt_rev_reads);
+        let alt_reads_ok = row.alt_dp.is_none_or(|ad| ad >= criteria.min_alt_reads);
+        let alt_rev_reads_ok = row
+            .alt_rv
+            .is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
         depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
     });
 
@@ -41,13 +51,8 @@ pub fn read_csv_files(
 
     for row in filtered_rows {
         all_positions.insert(row.position);
-        let sample_map = variants_by_sample
-            .entry(row.sample)
-            .or_default();
-
-        let site_data = sample_map
-            .entry(row.position)
-            .or_default();
+        let sample_map = variants_by_sample.entry(row.sample).or_default();
+        let site_data = sample_map.entry(row.position).or_default();
 
         if let Some(ref_a) = row.ref_allele {
             site_data.reference_allele = ref_a;
@@ -61,18 +66,25 @@ pub fn write_distance_matrix(
     path: &str,
     matrix: &[Vec<f64>],
     samples: &[String],
+    use_tab: bool,
 ) -> std::io::Result<()> {
-    let delimiter = match Path::new(path).extension().and_then(OsStr::to_str) {
-        Some("csv") => ",",
-        _ => "\t",
-    };
-
+    let sep = if use_tab { "\t" } else { "," };
     let mut file = File::create(path)?;
-    writeln!(file, "{}{}", delimiter, samples.join(delimiter))?;
 
+    // Header
+    write!(file, "sample")?;
+    for s in samples {
+        write!(file, "{}{}", sep, s)?;
+    }
+    writeln!(file)?;
+
+    // Rows
     for (i, row) in matrix.iter().enumerate() {
-        let row_str: Vec<String> = row.iter().map(|v| format!("{:.6}", v)).collect();
-        writeln!(file, "{}{}{}", samples[i], delimiter, row_str.join(delimiter))?;
+        write!(file, "{}", samples[i])?;
+        for val in row {
+            write!(file, "{}{:.6}", sep, val)?;
+        }
+        writeln!(file)?;
     }
     Ok(())
 }

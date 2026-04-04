@@ -3,20 +3,19 @@ mod types;
 mod io;
 mod calculation;
 
-use crate::types::{Calculation, FilterCriteria, SiteData};
-use anyhow::{bail, Context, Result};
 use clap::Parser;
+use crate::cli::{Args, Formula, InputMode};
+use crate::types::{Calculation, FilterCriteria, SiteData};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
-fn main() -> Result<()> {
-    let args = cli::Cli::parse();
+fn main() {
+    let args = Args::parse();
 
-    let (input_mode, files) = args.get_input_files()?;
-
-    if matches!(input_mode, cli::InputMode::Table) && args.reference.is_none() {
-        bail!("--reference is required for table mode.");
-    }
+    let (input_mode, files) = args.get_input_files().unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    });
 
     let criteria = FilterCriteria {
         min_depth: args.min_depth,
@@ -25,42 +24,44 @@ fn main() -> Result<()> {
         min_alt_rev_reads: args.min_alt_rev_reads,
     };
 
-    println!("\n--- Applying Filters ---");
-    println!("> Minimum Depth (DP): {}", criteria.min_depth);
-    println!("> Minimum Allele Freq (AF): {}", criteria.min_freq);
-    println!("> Minimum Alternate Reads (AD): {}", criteria.min_alt_reads);
-    println!("> Minimum Alt. Reverse Reads (ADR): {}", criteria.min_alt_rev_reads);
-    println!("------------------------\n");
+    // Inform user about applied filters
+    eprintln!("\n--- Applying Filters ---");
+    eprintln!("> Minimum Depth (DP): {}", criteria.min_depth);
+    eprintln!("> Minimum Allele Freq (AF): {}", criteria.min_freq);
+    eprintln!("> Minimum Alternate Reads (AD): {}", criteria.min_alt_reads);
+    eprintln!("> Minimum Alt. Reverse Reads (ADR): {}", criteria.min_alt_rev_reads);
+    eprintln!("------------------------\n");
 
-    let formula = match args.formula.as_str() {
-        "fst" => Calculation::Fst,
-        "gst" => Calculation::Gst,
-        "nei" => Calculation::Nei,
-        "chord" => Calculation::Chord,
-        "bray-curtis" => Calculation::BrayCurtis,
-        "jost_d" => Calculation::JostD,
-        "reynolds" => Calculation::Reynolds,
-        "rogers" => Calculation::Rogers,
-        _ => unreachable!(),
+    let formula = match args.formula {
+        Formula::Fst => Calculation::Fst,
+        Formula::Gst => Calculation::Gst,
+        Formula::Nei => Calculation::Nei,
+        Formula::Chord => Calculation::Chord,
+        Formula::BrayCurtis => Calculation::BrayCurtis,
+        Formula::JostD => Calculation::JostD,
+        Formula::Reynolds => Calculation::Reynolds,
+        Formula::Rogers => Calculation::Rogers,
     };
 
-    args.configure_thread_pool()?;
+    args.configure_thread_pool();
 
-    let reference_seq = if let Some(ref ref_path) = args.reference {
-        println!("Reading reference FASTA...");
-        let path_str = ref_path.to_str().unwrap_or("");
-        Some(io::fasta::read_reference_sequence(path_str)
-            .with_context(|| format!("Failed to read reference file: {}", path_str))?)
-    } else {
-        None
-    };
+    // Read reference if provided
+    let reference_seq = args.reference.as_ref().map(|path| {
+        eprintln!("Reading reference FASTA...");
+        io::fasta::read_reference_sequence(path.to_str().unwrap_or_default()).unwrap_or_else(|e| {
+            eprintln!("Error reading reference file: {}", e);
+            std::process::exit(1);
+        })
+    });
 
-    println!("Reading and processing {} input file(s)...", files.len());
+    // Read input files
+    eprintln!("Reading and processing input files...");
     let (all_positions, mut variants_by_sample) = match input_mode {
-        cli::InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria),
-        cli::InputMode::Table => io::csv::read_csv_files(&files, &criteria),
+        InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria),
+        InputMode::Table => io::csv::read_csv_files(&files, &criteria),
     };
 
+    // FASTA fallback for reference allele (only when reference is provided)
     if let Some(ref ref_seq) = reference_seq {
         for pos in &all_positions {
             for sample_data in variants_by_sample.values_mut() {
@@ -74,17 +75,29 @@ fn main() -> Result<()> {
         }
     }
 
-    let num_samples = variants_by_sample.len();
-    let num_loci = all_positions.len();
-    println!("Found {} samples and {} polymorphic sites after filtering.", num_samples, num_loci);
+    eprintln!(
+        "Found {} samples and {} polymorphic sites after filtering.",
+        variants_by_sample.len(),
+        all_positions.len()
+    );
 
+    // Prepare for calculation
     let samples: Vec<String> = {
         let mut s: Vec<String> = variants_by_sample.keys().cloned().collect();
         s.sort();
         s
     };
     let sample_pairs = calculation::generate_sample_pairs(&samples);
-    println!("Computing {} pairwise comparisons using {:?}...", sample_pairs.len(), args.formula);
+
+    // Pairwise calculations
+    let num_loci = all_positions.len();
+    let output_path_str = args.output.to_str().unwrap_or("output");
+
+    eprintln!(
+        "Computing {} distances for {} pairs...",
+        format!("{:?}", args.formula).to_lowercase(),
+        sample_pairs.len()
+    );
 
     let pb = ProgressBar::new(sample_pairs.len() as u64);
     pb.set_style(
@@ -99,14 +112,15 @@ fn main() -> Result<()> {
         .map(|&(i, j)| {
             let data1 = variants_by_sample.get(&samples[i]).unwrap();
             let data2 = variants_by_sample.get(&samples[j]).unwrap();
+            let normalize = args.normalize;
 
             let dist = match formula {
-                Calculation::Fst => calculation::fst::calculate_fst_for_pair(data1, data2, &all_positions, args.normalize, num_loci),
+                Calculation::Fst => calculation::fst::calculate_fst_for_pair(data1, data2, &all_positions, normalize, num_loci),
                 Calculation::Gst => calculation::gst::calculate_gst_for_pair(data1, data2, &all_positions),
                 Calculation::Nei => calculation::nei::calculate_nei_distance_for_pair(data1, data2, &all_positions),
-                Calculation::Chord => calculation::chord::calculate_chord_distance_for_pair(data1, data2, &all_positions, args.normalize, num_loci),
-                Calculation::BrayCurtis => calculation::bray_curtis::calculate_bray_curtis_for_pair(data1, data2, &all_positions, args.normalize, num_loci),
-                Calculation::JostD => calculation::jost_d::calculate_jost_d_for_pair(data1, data2, &all_positions, args.normalize, num_loci),
+                Calculation::Chord => calculation::chord::calculate_chord_distance_for_pair(data1, data2, &all_positions, normalize, num_loci),
+                Calculation::BrayCurtis => calculation::bray_curtis::calculate_bray_curtis_for_pair(data1, data2, &all_positions, normalize, num_loci),
+                Calculation::JostD => calculation::jost_d::calculate_jost_d_for_pair(data1, data2, &all_positions, normalize, num_loci),
                 Calculation::Reynolds => calculation::reynolds::calculate_reynolds_distance_for_pair(data1, data2, &all_positions),
                 Calculation::Rogers => calculation::rogers::calculate_rogers_distance_for_pair(data1, data2, &all_positions, num_loci),
             };
@@ -117,11 +131,17 @@ fn main() -> Result<()> {
 
     pb.finish_with_message("Calculation complete.");
 
+    // Write output
     let distance_matrix = calculation::create_distance_matrix(&results, samples.len());
-    let output_str = args.output.to_str().unwrap_or("output");
-    io::csv::write_distance_matrix(output_str, &distance_matrix, &samples)
-        .with_context(|| format!("Failed to write output file: {}", output_str))?;
-    println!("Distance matrix successfully written to {}", output_str);
 
-    Ok(())
+    // Auto-detect output delimiter from extension
+    let use_tab = output_path_str.ends_with(".tsv") || output_path_str.ends_with(".tab");
+
+    match io::csv::write_distance_matrix(output_path_str, &distance_matrix, &samples, use_tab) {
+        Ok(_) => eprintln!("Distance matrix written to {}", output_path_str),
+        Err(e) => {
+            eprintln!("Error writing output file: {}", e);
+            std::process::exit(1);
+        }
+    }
 }

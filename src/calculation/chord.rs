@@ -1,10 +1,12 @@
-use crate::types::PositionalData;
 use super::common::get_all_freqs_at_pos;
+use crate::types::PositionalData;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
 /// Calculates Cavalli-Sforza & Edwards' chord distance.
-/// This implementation sums the per-locus chord distances.
+///
+/// Per-locus: D_ch = √(2 (1 − Σ √(p_i q_i))).
+/// With `--normalize` the sum is divided by the number of loci.
 pub fn calculate_chord_distance_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
@@ -15,23 +17,18 @@ pub fn calculate_chord_distance_for_pair(
     let sum_dist: f64 = all_positions
         .par_iter()
         .map(|&pos| {
-            let (all_alleles, freqs1, freqs2) = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
-
-            let sum_sqrt_pq: f64 = all_alleles
+            let psf = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
+            let sum_sqrt: f64 = psf
+                .all_alleles
                 .iter()
-                .map(|allele| {
-                    let p_i = *freqs1.get(allele).unwrap_or(&0.0);
-                    let q_i = *freqs2.get(allele).unwrap_or(&0.0);
-                    (p_i * q_i).sqrt()
+                .map(|a| {
+                    let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+                    let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+                    (p * q).sqrt()
                 })
                 .sum();
-
-            let term = 2.0 * (1.0 - sum_sqrt_pq);
-            if term > 0.0 {
-                term.sqrt()
-            } else {
-                0.0
-            }
+            let term = 2.0 * (1.0 - sum_sqrt);
+            if term > 0.0 { term.sqrt() } else { 0.0 }
         })
         .sum();
 

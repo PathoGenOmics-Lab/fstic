@@ -1,11 +1,12 @@
-use crate::types::PositionalData;
 use super::common::get_all_freqs_at_pos;
+use crate::types::PositionalData;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
-/// Calculates the Bray-Curtis dissimilarity, which for frequency data is
-/// equivalent to the Absolute or Manhattan distance: D = 0.5 * sum(|pi - qi|).
-/// This implementation sums the per-locus distances.
+/// Calculates Bray-Curtis dissimilarity: BC = 0.5 Σ |p_i − q_i|.
+///
+/// Equivalent to the Manhattan distance on allele frequency profiles.
+/// With `--normalize` the sum is divided by the number of loci.
 pub fn calculate_bray_curtis_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
@@ -16,18 +17,17 @@ pub fn calculate_bray_curtis_for_pair(
     let sum_dist: f64 = all_positions
         .par_iter()
         .map(|&pos| {
-            let (all_alleles, freqs1, freqs2) = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
-
-            let sum_abs_diff: f64 = all_alleles
+            let psf = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
+            let abs_diff: f64 = psf
+                .all_alleles
                 .iter()
-                .map(|allele| {
-                    let p_i = *freqs1.get(allele).unwrap_or(&0.0);
-                    let q_i = *freqs2.get(allele).unwrap_or(&0.0);
-                    (p_i - q_i).abs()
+                .map(|a| {
+                    let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+                    let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+                    (p - q).abs()
                 })
                 .sum();
-
-            0.5 * sum_abs_diff
+            0.5 * abs_diff
         })
         .sum();
 

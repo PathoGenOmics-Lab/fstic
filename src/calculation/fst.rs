@@ -1,10 +1,12 @@
+use super::common::{get_all_freqs_at_pos, heterozygosity, pooled_heterozygosity};
 use crate::types::PositionalData;
-use super::common::get_all_freqs_at_pos;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
-/// Calculates FST as the sum of per-site Nei's GST: (Ht - Hs) / Ht.
-/// Note: this is a ratio-of-sums Nei GST, not Weir & Cockerham's theta.
+/// Calculates FST as sum-of-per-site Nei's GST: Σ (Ht - Hs) / Ht.
+///
+/// Note: this is Nei's (1973) approach, *not* the Weir & Cockerham (1984) θ estimator.
+/// With `--normalize` the result is divided by the number of loci.
 pub fn calculate_fst_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
@@ -15,27 +17,10 @@ pub fn calculate_fst_for_pair(
     let sum_fsts: f64 = all_positions
         .par_iter()
         .map(|&pos| {
-            let (all_alleles, freqs1, freqs2) = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
-
-            let h1: f64 = 1.0 - freqs1.values().map(|p| p.powi(2)).sum::<f64>();
-            let h2: f64 = 1.0 - freqs2.values().map(|p| p.powi(2)).sum::<f64>();
-            let h_s = (h1 + h2) / 2.0;
-
-            let h_t: f64 = 1.0 - all_alleles
-                .iter()
-                .map(|allele| {
-                    let p_i = freqs1.get(allele).unwrap_or(&0.0);
-                    let q_i = freqs2.get(allele).unwrap_or(&0.0);
-                    let mean_freq = (p_i + q_i) / 2.0;
-                    mean_freq.powi(2)
-                })
-                .sum::<f64>();
-
-            if h_t > 0.0 {
-                (h_t - h_s) / h_t
-            } else {
-                0.0
-            }
+            let psf = get_all_freqs_at_pos(data1.get(&pos), data2.get(&pos));
+            let h_s = (heterozygosity(&psf.freqs1) + heterozygosity(&psf.freqs2)) / 2.0;
+            let h_t = pooled_heterozygosity(&psf);
+            if h_t > 0.0 { (h_t - h_s) / h_t } else { 0.0 }
         })
         .sum();
 
