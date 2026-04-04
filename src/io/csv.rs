@@ -22,7 +22,7 @@ pub fn read_csv_files(
             };
 
             let rdr = csv::ReaderBuilder::new()
-                .flexible(true)
+                .flexible(false)
                 .delimiter(delimiter)
                 .from_path(file);
 
@@ -118,9 +118,15 @@ pub fn write_distance_matrix(
     for (i, row) in matrix.iter().enumerate() {
         write!(file, "{}", quote_field(&samples[i], sep))?;
         for val in row {
-            // 10 decimal places prevents rounding closely-related pairs to 0
-            // (e.g. MTB FST ~1e-8). Standard tools accept this fine.
-            write!(file, "{}{:.10}", sep, val)?;
+            if val.is_finite() {
+                // 10 decimal places prevents rounding closely-related pairs to 0
+                // (e.g. MTB FST ~1e-8). Standard tools accept this fine.
+                write!(file, "{}{:.10}", sep, val)?;
+            } else {
+                // Nei/Reynolds can produce Infinity for fixed differences.
+                // Use NA for compatibility with R/Python/downstream tools.
+                write!(file, "{}NA", sep)?;
+            }
         }
         writeln!(file)?;
     }
