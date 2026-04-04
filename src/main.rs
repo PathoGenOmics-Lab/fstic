@@ -6,7 +6,6 @@ mod calculation;
 use crate::types::{Calculation, FilterCriteria, SiteData};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 fn main() {
     // 1. Parse command-line arguments
@@ -16,10 +15,16 @@ fn main() {
         std::process::exit(1);
     });
 
-    let reference_path = matches.value_of("reference").unwrap();
+    let reference_path = matches.value_of("reference");
     let output_path = matches.value_of("output").unwrap();
     let normalize = matches.is_present("normalize");
-    
+
+    // Require reference for table mode
+    if matches!(input_mode, cli::InputMode::Table) && reference_path.is_none() {
+        eprintln!("Error: --reference is required for table mode.");
+        std::process::exit(1);
+    }
+
     // Parse filter arguments
     let criteria = FilterCriteria {
         min_depth: matches.value_of("min_depth").unwrap().parse().expect("min-depth must be an integer"),
@@ -49,31 +54,37 @@ fn main() {
     };
     cli::configure_thread_pool(&matches);
 
-    // 2. Read reference and input files
-    println!("Reading reference FASTA...");
-    let reference_seq = io::fasta::read_reference_sequence(reference_path).unwrap_or_else(|e| {
-        eprintln!("Error reading reference file {}: {}", reference_path, e);
-        std::process::exit(1);
-    });
-    
+    // 2. Read reference (if provided) and input files
+    let reference_seq = if let Some(ref_path) = reference_path {
+        println!("Reading reference FASTA...");
+        Some(io::fasta::read_reference_sequence(ref_path).unwrap_or_else(|e| {
+            eprintln!("Error reading reference file {}: {}", ref_path, e);
+            std::process::exit(1);
+        }))
+    } else {
+        None
+    };
+
     println!("Reading and processing input files...");
     let (all_positions, mut variants_by_sample) = match input_mode {
         cli::InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria),
         cli::InputMode::Table => io::csv::read_csv_files(&files, &criteria),
     };
-    
+
     // 3. FASTA Fallback for reference allele if needed
-    for pos in &all_positions {
-        for sample_data in variants_by_sample.values_mut() {
-            let site = sample_data.entry(*pos).or_insert_with(SiteData::default);
-            if site.reference_allele.is_empty() {
-                if let Some(ref_char) = reference_seq.get(pos - 1) {
-                    site.reference_allele = ref_char.to_string();
+    if let Some(ref ref_seq) = reference_seq {
+        for pos in &all_positions {
+            for sample_data in variants_by_sample.values_mut() {
+                let site = sample_data.entry(*pos).or_insert_with(SiteData::default);
+                if site.reference_allele.is_empty() {
+                    if let Some(ref_char) = ref_seq.get(pos - 1) {
+                        site.reference_allele = ref_char.to_string();
+                    }
                 }
             }
         }
     }
-    
+
     println!("Found {} samples and {} polymorphic sites after filtering.", variants_by_sample.len(), all_positions.len());
 
     // 4. Prepare for calculation

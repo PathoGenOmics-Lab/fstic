@@ -48,8 +48,7 @@ pub fn build_cli() -> App<'static, 'static> {
                 .short("r")
                 .long("reference")
                 .value_name("FASTA_FILE")
-                .help("Reference FASTA file (required for all inputs).")
-                .required(true),
+                .help("Reference FASTA file (required for table mode, optional for VCF)."),
         )
         .arg(
             Arg::with_name("output")
