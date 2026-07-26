@@ -6,25 +6,66 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Counters for input that was dropped or could not be used, reported once per run
+/// rather than once per line: a whole-genome VCF with a systematic problem would
+/// otherwise bury the terminal in millions of identical warnings.
+#[derive(Default)]
+pub struct VcfStats {
+    multi_allelic: AtomicUsize,
+    bad_int: AtomicUsize,
+    bad_freq: AtomicUsize,
+    freq_out_of_range: AtomicUsize,
+}
+
+impl VcfStats {
+    fn report(&self) {
+        let n = self.multi_allelic.load(Ordering::Relaxed);
+        if n > 0 {
+            eprintln!(
+                "Warning: skipped {} multi-allelic site(s) (>1 ALT allele). \
+                 Only bi-allelic sites are currently supported.",
+                n
+            );
+        }
+        let n = self.bad_int.load(Ordering::Relaxed);
+        if n > 0 {
+            eprintln!(
+                "Warning: {} FORMAT value(s) for DP/AD/ADR could not be parsed as integers. \
+                 The corresponding depth filters could not be applied to those variants.",
+                n
+            );
+        }
+        let n = self.bad_freq.load(Ordering::Relaxed);
+        if n > 0 {
+            eprintln!(
+                "Warning: {} variant(s) had an unparseable FREQ value and no usable AD/DP \
+                 fallback; they were dropped.",
+                n
+            );
+        }
+        let n = self.freq_out_of_range.load(Ordering::Relaxed);
+        if n > 0 {
+            eprintln!(
+                "Warning: dropped {} variant(s) whose allele frequency fell outside [0,1] \
+                 (a FREQ out of range, or AD greater than DP).",
+                n
+            );
+        }
+    }
+}
+
 pub fn read_vcf_files(
     files: &[PathBuf],
     criteria: &FilterCriteria,
 ) -> (HashSet<GenomicPos>, SampleVariants) {
-    let multi_allelic_count = AtomicUsize::new(0);
+    let stats = VcfStats::default();
 
     let all_variants: Vec<VcfVariant> = files
         .par_iter()
-        .flat_map(|file| parse_and_filter_vcf(file, criteria, &multi_allelic_count))
+        .flat_map(|file| parse_and_filter_vcf(file, criteria, &stats))
         .collect();
 
-    let skipped = multi_allelic_count.load(Ordering::Relaxed);
-    if skipped > 0 {
-        eprintln!(
-            "Warning: skipped {} multi-allelic site(s) (>1 ALT allele). \
-             Only bi-allelic sites are currently supported.",
-            skipped
-        );
-    }
+    stats.report();
 
     let mut variants_by_sample: SampleVariants = HashMap::new();
     let mut all_positions: HashSet<GenomicPos> = HashSet::new();
@@ -58,7 +99,7 @@ pub fn read_vcf_files(
 fn parse_and_filter_vcf(
     file: &Path,
     criteria: &FilterCriteria,
-    multi_allelic_count: &AtomicUsize,
+    stats: &VcfStats,
 ) -> Vec<VcfVariant> {
     // Sample ID from filename (one VCF per sample is the expected input model)
     let sample_id = file
@@ -123,7 +164,7 @@ fn parse_and_filter_vcf(
 
         // Skip multi-allelic sites with a count
         if fields[4].contains(',') {
-            multi_allelic_count.fetch_add(1, Ordering::Relaxed);
+            stats.multi_allelic.fetch_add(1, Ordering::Relaxed);
             continue;
         }
 
@@ -132,7 +173,7 @@ fn parse_and_filter_vcf(
             continue;
         }
 
-        if let Some(variant) = parse_vcf_line(&fields, &sample_id, file, &mut warned) {
+        if let Some(variant) = parse_vcf_line(&fields, &sample_id, file, &mut warned, stats) {
             variants.push(variant);
         }
     }
@@ -156,6 +197,7 @@ fn parse_vcf_line(
     sample_id: &str,
     filepath: &Path,
     warned: &mut HashSet<String>,
+    stats: &VcfStats,
 ) -> Option<VcfVariant> {
     let chrom = fields[0].to_string();
     let pos = fields[1].parse::<usize>().ok()?;
@@ -171,6 +213,9 @@ fn parse_vcf_line(
 
     let get_value = |key: &str| -> &str { format_map.get(key).copied().unwrap_or(".") };
 
+    // A value that is present but unparseable is not the same as an absent field: the
+    // filter the user asked for cannot be applied either way, but corrupt input has to
+    // be counted so the run does not look clean.
     let parse_int_warn = |key: &str, warned: &mut HashSet<String>| -> Option<u32> {
         match get_value(key) {
             "." => {
@@ -184,7 +229,13 @@ fn parse_vcf_line(
                 }
                 None
             }
-            val => val.parse::<u32>().ok(),
+            val => {
+                let parsed = val.parse::<u32>().ok();
+                if parsed.is_none() {
+                    stats.bad_int.fetch_add(1, Ordering::Relaxed);
+                }
+                parsed
+            }
         }
     };
 
@@ -205,17 +256,31 @@ fn parse_vcf_line(
             None
         }
         val => {
-            if val.contains(',') {
-                // Standard VCF: AD=ref,alt — take the second value (alt depth)
+            let parsed = if val.contains(',') {
+                // Standard VCF: AD=ref,alt, take the second value (alt depth)
                 val.split(',').nth(1).and_then(|s| s.parse::<u32>().ok())
             } else {
                 // VarScan style: AD=alt_reads (single integer)
                 val.parse::<u32>().ok()
+            };
+            if parsed.is_none() {
+                stats.bad_int.fetch_add(1, Ordering::Relaxed);
             }
+            parsed
         }
     };
 
     let alt_rv = parse_int_warn("ADR", warned);
+
+    // AD/DP is the fallback whenever FREQ is unusable. AD > DP happens with real
+    // callers and would otherwise yield a frequency above 1, which drives
+    // heterozygosity negative and takes every metric out of its range.
+    let freq_from_depth = || -> Option<f64> {
+        match (alt_dp, total_dp) {
+            (Some(ad), Some(dp)) if dp > 0 => Some(ad as f64 / dp as f64),
+            _ => None,
+        }
+    };
 
     // FREQ: handle proportion (0.5), percentage (50%), or compute from AD/DP
     let alt_freq = match get_value("FREQ") {
@@ -227,39 +292,40 @@ fn parse_vcf_line(
                     filepath.display()
                 );
             }
-            // Compute from AD/DP if available
-            match (alt_dp, total_dp) {
-                (Some(ad), Some(dp)) if dp > 0 => Some(ad as f64 / dp as f64),
-                _ => None,
-            }
+            freq_from_depth()
         }
         val => {
-            let parsed = if val.ends_with('%') {
-                val.trim_end_matches('%')
-                    .parse::<f64>()
-                    .ok()
-                    .map(|f| f / 100.0)
+            // Number=A fields arrive comma-separated; this is a bi-allelic site by
+            // the time we get here, so the first component is the one we want.
+            let val = val.split(',').next().unwrap_or(val).trim();
+            let parsed = if let Some(stripped) = val.strip_suffix('%') {
+                stripped.trim().parse::<f64>().ok().map(|f| f / 100.0)
             } else {
                 val.parse::<f64>().ok()
             };
-            // Validate range
-            parsed.and_then(|f| {
-                if f.is_finite() && (0.0..=1.0).contains(&f) {
-                    Some(f)
-                } else {
-                    eprintln!(
-                        "Warning: VCF file '{}' pos {} has out-of-range FREQ={} (expected 0-1). Skipping site.",
-                        filepath.display(), pos, f
-                    );
-                    None
+            match parsed {
+                Some(f) => Some(f),
+                None => {
+                    let fallback = freq_from_depth();
+                    if fallback.is_none() {
+                        stats.bad_freq.fetch_add(1, Ordering::Relaxed);
+                    }
+                    fallback
                 }
-            })
+            }
         }
     };
 
-    // If freq is still None after all attempts, skip this variant entirely
-    // (we cannot compute distances without knowing the allele frequency)
-    let alt_freq = alt_freq?;
+    // Whatever the source, an allele frequency outside [0,1] is not usable.
+    let alt_freq = match alt_freq {
+        Some(f) if f.is_finite() && (0.0..=1.0).contains(&f) => f,
+        Some(_) => {
+            stats.freq_out_of_range.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+        // Cannot compute distances without knowing the allele frequency.
+        None => return None,
+    };
 
     Some(VcfVariant {
         sample: sample_id.to_string(),

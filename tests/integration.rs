@@ -11,6 +11,17 @@ fn write_vcf(dir: &Path, name: &str, lines: &[&str]) {
     fs::write(dir.join(format!("{}.vcf", name)), content).unwrap();
 }
 
+/// First off-diagonal value of a 2x2 matrix file. Asserting on the parsed number
+/// instead of a substring is the difference between a real check and one that the
+/// zero on the diagonal satisfies by accident.
+fn off_diagonal(content: &str, sep: char) -> f64 {
+    let line = content.lines().nth(1).expect("matrix needs a first data row");
+    let cell = line.split(sep).nth(2).expect("matrix needs a second column");
+    cell.trim()
+        .parse()
+        .unwrap_or_else(|_| panic!("cell {:?} is not a number", cell))
+}
+
 /// Two identical samples should produce distance = 0.
 #[test]
 fn identical_samples_zero_distance() {
@@ -276,6 +287,80 @@ fn freq_from_ad_dp() {
     let content = fs::read_to_string(&out).unwrap();
     // Same freq → distance = 0
     assert!(content.contains("0.000000"));
+}
+
+/// AD greater than DP would give a frequency above 1, which drives heterozygosity
+/// negative. The variant must be dropped and the drop reported.
+#[test]
+fn freq_above_one_from_ad_dp_is_dropped() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "s1", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:10:15",   // AD > DP, unusable
+        "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD\t0/1:100:50",  // fine
+    ]);
+    write_vcf(dir.path(), "s2", &[
+        header,
+        "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD\t0/1:100:50",
+    ]);
+
+    let out = dir.path().join("out.csv");
+    let res = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(res.status.success());
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(err.contains("outside [0,1]"), "the drop must be reported, got: {}", err);
+    // Only chr1:200 survives, and both samples agree there
+    assert!(err.contains("1 polymorphic sites"), "got: {}", err);
+    assert_eq!(off_diagonal(&fs::read_to_string(&out).unwrap(), ','), 0.0);
+}
+
+/// An AD value that cannot be parsed must not silently bypass --min-alt-reads.
+#[test]
+fn unparseable_ad_is_reported() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "s1", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:.,.:90%",
+    ]);
+    write_vcf(dir.path(), "s2", &[
+        header,
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:90,10:10%",
+    ]);
+
+    let out = dir.path().join("out.csv");
+    let res = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("s1.vcf").to_str().unwrap(),
+            dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "50", "--min-alt-rev-reads", "0",
+        ])
+        .output()
+        .unwrap();
+
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(
+        err.contains("could not be parsed as integers"),
+        "a filter that could not be applied must be reported, got: {}",
+        err
+    );
 }
 
 /// --pass-only should skip non-PASS variants.
