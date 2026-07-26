@@ -1,0 +1,84 @@
+name: Documentation
+
+# Build the MkDocs Material site and publish it to GitHub Pages (gh-pages
+# branch). After the first successful run, set Settings -> Pages -> Source to
+# "Deploy from a branch" and pick the gh-pages branch (root).
+#
+# Deploys on a push to main, so the published site tracks main rather than
+# redeploying from every working branch. Pull requests build without deploying,
+# which is what catches a dead link before it ships. To publish on demand from
+# any branch, use the "Run workflow" button (workflow_dispatch).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: pip install -r requirements-docs.txt
+
+      # --strict turns broken internal links and missing nav entries into
+      # errors, so a pull request that breaks one fails here instead of
+      # shipping a dead link.
+      - name: Build
+        run: mkdocs build --strict
+
+  deploy:
+    name: Deploy
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Cache MkDocs build
+        uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ github.sha }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+
+      - name: Install dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Build and deploy
+        run: mkdocs gh-deploy --force --strict

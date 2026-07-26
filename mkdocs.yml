@@ -1,0 +1,151 @@
+site_name: Fstic
+site_description: >-
+  Pairwise genetic distance matrices from allele-frequency data. Fstic reads
+  single-sample VCFs or frequency tables and computes eight standard estimators
+  (FST, GST, Jost's D, Reynolds, Nei, chord, Rogers, Bray-Curtis) in parallel.
+site_author: PathoGenOmics Lab
+site_url: https://pathogenomics-lab.github.io/fstic/
+
+repo_name: PathoGenOmics-Lab/fstic
+repo_url: https://github.com/PathoGenOmics-Lab/fstic
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; PathoGenOmics Lab &middot; GPL-3.0
+
+theme:
+  name: material
+  logo: assets/fstic_logo.svg
+  favicon: assets/fstic_logo.svg
+  language: en
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    admonition:
+      note: material/dna
+  palette:
+    - media: "(prefers-color-scheme)"
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+
+# Broken cross-references and dead anchors become warnings, which `mkdocs build
+# --strict` in CI turns into a failed build.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path:
+        - "."
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PathoGenOmics-Lab/fstic
+      name: Fstic on GitHub
+    - icon: fontawesome/solid/box
+      link: https://anaconda.org/bioconda/fstic
+      name: Fstic on Bioconda
+  generator: false
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/installation.md
+      - getting-started/quickstart.md
+      - getting-started/inputs.md
+  - User guide:
+      - guide/metrics.md
+      - guide/filtering.md
+      - guide/outputs.md
+      - guide/cli.md
+  - How it works:
+      - how-it-works/model.md
+      - how-it-works/reliability.md
+  - About:
+      - about/changelog.md
+      - about/citation.md
+      - about/contributing.md
