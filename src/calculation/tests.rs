@@ -479,6 +479,37 @@ mod tests {
         assert!(crate::io::fasta::read_reference(p.to_str().unwrap()).is_err());
     }
 
+    fn read_fa(body: &str) -> Result<crate::io::fasta::ReferenceGenome, std::io::Error> {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("ref.fa");
+        std::fs::write(&p, body).unwrap();
+        crate::io::fasta::read_reference(p.to_str().unwrap())
+    }
+
+    #[test]
+    fn fasta_nameless_record_rejected() {
+        // Used to leave current_name empty, so the nameless record's bases were
+        // prepended to the next contig and shifted every coordinate after it.
+        assert!(read_fa(">\nAAAA\n>chr1\nCCCC\n").is_err());
+    }
+
+    #[test]
+    fn fasta_sequence_before_header_rejected() {
+        assert!(read_fa("AAAA\n>chr1\nCCCC\n").is_err());
+    }
+
+    #[test]
+    fn fasta_duplicate_contig_rejected() {
+        assert!(read_fa(">chr1\nAAAA\n>chr1\nCCCC\n").is_err());
+    }
+
+    #[test]
+    fn fasta_records_stay_separate() {
+        let g = read_fa(">chr1 description here\nAA\nAA\n>chr2\nCCCC\n").unwrap();
+        assert_eq!(g["chr1"], b"AAAA");
+        assert_eq!(g["chr2"], b"CCCC");
+    }
+
     // ── All symmetric ───────────────────────────────────────────────────
 
     #[test]
