@@ -1,5 +1,9 @@
 # Quick start
 
+The commands you will actually use, in the order you will need them. For a
+worked example with real output and an interpretation at the end, see the
+[tutorial](../tutorial.md).
+
 ## The shortest useful run
 
 One VCF per sample, named after the sample, and an output path:

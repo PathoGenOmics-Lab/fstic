@@ -137,6 +137,7 @@ nav:
       - getting-started/installation.md
       - getting-started/quickstart.md
       - getting-started/inputs.md
+  - Tutorial: tutorial.md
   - User guide:
       - guide/metrics.md
       - guide/filtering.md

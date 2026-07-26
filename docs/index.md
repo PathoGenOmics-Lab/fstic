@@ -86,8 +86,11 @@ fstic --vcf sample*.vcf --output distances.csv --formula fst
     cargo build --release
     ```
 
-[Getting started :octicons-arrow-right-24:](getting-started/installation.md){ .md-button .md-button--primary }
-[Quick start :octicons-arrow-right-24:](getting-started/quickstart.md){ .md-button }
+[Tutorial :octicons-arrow-right-24:](tutorial.md){ .md-button .md-button--primary }
+[Install :octicons-arrow-right-24:](getting-started/installation.md){ .md-button }
+
+New here? The [tutorial](tutorial.md) walks a four-sample cluster from raw VCFs
+to a tree, and finds a mixed infection on the way. Ten minutes, no downloads.
 
 ## What a distance means here
 
