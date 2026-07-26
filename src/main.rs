@@ -117,37 +117,38 @@ fn run() -> Result<(), String> {
         }
     }
 
-    // Check for inconsistent reference alleles across samples at the same position
+    // Check for inconsistent reference alleles across samples at the same position.
+    // Collecting the distinct alleles per position, rather than comparing each one
+    // against whichever was seen first, keeps both the count and the example stable:
+    // the old version counted occurrences rather than positions, and which allele was
+    // called "first" depended on HashMap iteration order.
     {
-        let mut ref_alleles_by_pos: std::collections::HashMap<&types::GenomicPos, String> = std::collections::HashMap::new();
-        let mut inconsistent_count = 0usize;
+        use std::collections::{BTreeMap, BTreeSet};
+        let mut ref_alleles_by_pos: BTreeMap<&types::GenomicPos, BTreeSet<&str>> = BTreeMap::new();
         for sample_data in variants_by_sample.values() {
             for (gpos, site) in sample_data {
                 if site.reference_allele.is_empty() {
                     continue;
                 }
-                match ref_alleles_by_pos.get(gpos) {
-                    Some(prev_ref) if *prev_ref != site.reference_allele => {
-                        if inconsistent_count == 0 {
-                            eprintln!(
-                                "Warning: inconsistent REF alleles at {}:{} ('{}' vs '{}'). \
-                                 Check that all VCFs were called against the same reference.",
-                                gpos.chrom, gpos.pos, prev_ref, site.reference_allele
-                            );
-                        }
-                        inconsistent_count += 1;
-                    }
-                    None => {
-                        ref_alleles_by_pos.insert(gpos, site.reference_allele.clone());
-                    }
-                    _ => {}
-                }
+                ref_alleles_by_pos
+                    .entry(gpos)
+                    .or_default()
+                    .insert(site.reference_allele.as_str());
             }
         }
-        if inconsistent_count > 0 {
+
+        let mut conflicting = ref_alleles_by_pos.iter().filter(|(_, alleles)| alleles.len() > 1);
+        if let Some((gpos, alleles)) = conflicting.next() {
+            let n = 1 + conflicting.count();
+            let listed: Vec<&str> = alleles.iter().copied().collect();
             eprintln!(
-                "Warning: {} position(s) have inconsistent REF alleles across samples.",
-                inconsistent_count
+                "Warning: {} position(s) have inconsistent REF alleles across samples, \
+                 first at {}:{} ({}). \
+                 Check that all inputs were called against the same reference.",
+                n,
+                gpos.chrom,
+                gpos.pos,
+                listed.join(" vs ")
             );
         }
     }
