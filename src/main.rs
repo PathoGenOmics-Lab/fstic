@@ -54,6 +54,15 @@ fn run() -> Result<(), String> {
         InputMode::Table => io::csv::read_csv_files(&files, &criteria)?,
     };
 
+    let rescaled = io::renormalise_saturated_sites(&mut variants_by_sample);
+    if rescaled > 0 {
+        eprintln!(
+            "Warning: rescaled {} site(s) whose allele frequencies summed above 1 \
+             (independently estimated frequencies from split multi-allelic records).",
+            rescaled
+        );
+    }
+
     // FASTA fallback for reference allele (chrom-aware)
     // Only update samples that already have an entry at this position,
     // to avoid creating phantom empty entries for every sample×position.

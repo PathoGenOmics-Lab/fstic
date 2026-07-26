@@ -510,6 +510,39 @@ mod tests {
         assert_eq!(g["chr2"], b"CCCC");
     }
 
+    // ── Frequency renormalisation ───────────────────────────────────────
+
+    #[test]
+    fn saturated_site_is_rescaled() {
+        // Split multi-allelic records: two independently estimated 0.9 frequencies.
+        let mut sv = crate::types::SampleVariants::new();
+        sv.insert("s1".to_string(), make_data(&[(100, "A", &[("T", 0.9), ("G", 0.9)])]));
+        assert_eq!(crate::io::renormalise_saturated_sites(&mut sv), 1);
+
+        let freqs = &sv["s1"][&gp(100)].freqs;
+        let sum: f64 = freqs.values().sum();
+        assert!((sum - 1.0).abs() < 1e-10, "sum is {}", sum);
+        assert!((freqs["T"] - 0.5).abs() < 1e-10);
+        // Heterozygosity must be back in [0,1]
+        let h = heterozygosity(freqs);
+        assert!((0.0..=1.0).contains(&h), "heterozygosity is {}", h);
+    }
+
+    #[test]
+    fn well_formed_sites_are_left_alone() {
+        let mut sv = crate::types::SampleVariants::new();
+        sv.insert("s1".to_string(), make_data(&[(100, "A", &[("T", 0.3)]), (200, "C", &[("G", 1.0)])]));
+        assert_eq!(crate::io::renormalise_saturated_sites(&mut sv), 0);
+        assert!((sv["s1"][&gp(100)].freqs["T"] - 0.3).abs() < 1e-10);
+    }
+
+    #[test]
+    fn rounding_noise_is_not_rescaled() {
+        let mut sv = crate::types::SampleVariants::new();
+        sv.insert("s1".to_string(), make_data(&[(100, "A", &[("T", 1.0 + 1e-12)])]));
+        assert_eq!(crate::io::renormalise_saturated_sites(&mut sv), 0);
+    }
+
     // ── All symmetric ───────────────────────────────────────────────────
 
     #[test]
