@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub fn read_csv_files(
     files: &[PathBuf],
     criteria: &FilterCriteria,
-) -> (HashSet<GenomicPos>, SampleVariants) {
+) -> Result<(HashSet<GenomicPos>, SampleVariants), String> {
     let error_count = AtomicUsize::new(0);
 
     let all_rows: Vec<TableInputRow> = files
@@ -86,7 +86,7 @@ pub fn read_csv_files(
         }
         site_data.freqs.insert(row.sequence, row.frequency);
     }
-    (all_positions, variants_by_sample)
+    Ok((all_positions, variants_by_sample))
 }
 
 /// Quote a field if it contains the separator, a quote, or a newline.

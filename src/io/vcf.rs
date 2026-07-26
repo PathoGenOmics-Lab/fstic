@@ -57,20 +57,70 @@ impl VcfStats {
 pub fn read_vcf_files(
     files: &[PathBuf],
     criteria: &FilterCriteria,
-) -> (HashSet<GenomicPos>, SampleVariants) {
+) -> Result<(HashSet<GenomicPos>, SampleVariants), String> {
     let stats = VcfStats::default();
 
-    let all_variants: Vec<VcfVariant> = files
+    let parsed: Vec<ParsedVcf> = files
         .par_iter()
-        .flat_map(|file| parse_and_filter_vcf(file, criteria, &stats))
+        .map(|file| parse_and_filter_vcf(file, criteria, &stats))
         .collect();
 
     stats.report();
 
+    // The sample name is the file stem, so two inputs with the same basename in
+    // different directories would land in the same matrix row and one would be lost.
+    let mut seen: HashMap<&str, &PathBuf> = HashMap::new();
+    for p in &parsed {
+        if let Some(first) = seen.insert(p.sample.as_str(), &p.path) {
+            return Err(format!(
+                "Two input files share the sample name '{}': {} and {}. \
+                 Sample names come from the file name, so rename one of them.",
+                p.sample,
+                first.display(),
+                p.path.display()
+            ));
+        }
+    }
+
+    for p in &parsed {
+        if let Some(err) = &p.io_error {
+            return Err(format!("Error reading VCF file {}: {}", p.path.display(), err));
+        }
+        if p.data_lines == 0 {
+            return Err(format!(
+                "No VCF data lines could be read from {}. \
+                 Check the file is an uncompressed, tab-delimited VCF.",
+                p.path.display()
+            ));
+        }
+        if p.short_lines > 0 {
+            eprintln!(
+                "Warning: {}: {} data line(s) had fewer than 10 tab-separated columns \
+                 and were skipped (sites-only or space-delimited VCF?).",
+                p.path.display(),
+                p.short_lines
+            );
+        }
+        if p.variants.is_empty() {
+            eprintln!(
+                "Warning: {} has no variants left after filtering; \
+                 '{}' is treated as identical to the reference.",
+                p.path.display(),
+                p.sample
+            );
+        }
+    }
+
     let mut variants_by_sample: SampleVariants = HashMap::new();
     let mut all_positions: HashSet<GenomicPos> = HashSet::new();
 
-    for variant in all_variants {
+    // Register every input up front so a sample with no surviving variants still
+    // gets a matrix row rather than vanishing from the output.
+    for p in &parsed {
+        variants_by_sample.entry(p.sample.clone()).or_default();
+    }
+
+    for variant in parsed.into_iter().flat_map(|p| p.variants) {
         let gpos = GenomicPos {
             chrom: variant.chrom.clone(),
             pos: variant.pos,
@@ -93,14 +143,25 @@ pub fn read_vcf_files(
             .or_insert(variant.alt_freq);
     }
 
-    (all_positions, variants_by_sample)
+    Ok((all_positions, variants_by_sample))
+}
+
+/// One input file's worth of variants, plus what happened while reading it.
+struct ParsedVcf {
+    sample: String,
+    path: PathBuf,
+    variants: Vec<VcfVariant>,
+    /// Non-header lines seen. Zero means the file was not a readable plain VCF.
+    data_lines: usize,
+    short_lines: usize,
+    io_error: Option<String>,
 }
 
 fn parse_and_filter_vcf(
     file: &Path,
     criteria: &FilterCriteria,
     stats: &VcfStats,
-) -> Vec<VcfVariant> {
+) -> ParsedVcf {
     // Sample ID from filename (one VCF per sample is the expected input model)
     let sample_id = file
         .file_stem()
@@ -108,18 +169,36 @@ fn parse_and_filter_vcf(
         .unwrap_or("unknown_sample")
         .to_string();
 
+    let mut report = ParsedVcf {
+        sample: sample_id.clone(),
+        path: file.to_path_buf(),
+        variants: Vec::new(),
+        data_lines: 0,
+        short_lines: 0,
+        io_error: None,
+    };
+
     let vcf_file = match File::open(file) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("Error: cannot open VCF file {}: {}", file.display(), e);
-            return Vec::new();
+            report.io_error = Some(e.to_string());
+            return report;
         }
     };
     let reader = BufReader::new(vcf_file);
     let mut warned: HashSet<String> = HashSet::new();
 
     let mut variants = Vec::new();
-    for line in reader.lines().map_while(Result::ok) {
+    for line in reader.lines() {
+        // Bailing out quietly here truncated the file at the first read error, and a
+        // gzipped VCF hits one immediately: the sample came out empty, exit code 0.
+        let line = match line {
+            Ok(l) => l,
+            Err(e) => {
+                report.io_error = Some(e.to_string());
+                return report;
+            }
+        };
         if line.starts_with("##") {
             continue;
         }
@@ -139,8 +218,11 @@ fn parse_and_filter_vcf(
             continue;
         }
 
+        report.data_lines += 1;
+
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.len() < 10 {
+            report.short_lines += 1;
             continue;
         }
 
@@ -178,7 +260,7 @@ fn parse_and_filter_vcf(
         }
     }
 
-    variants
+    report.variants = variants
         .into_iter()
         .filter(|v| {
             let depth_ok = v.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
@@ -189,7 +271,8 @@ fn parse_and_filter_vcf(
                 .is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
             depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
         })
-        .collect()
+        .collect();
+    report
 }
 
 fn parse_vcf_line(

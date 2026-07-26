@@ -289,6 +289,71 @@ fn freq_from_ad_dp() {
     assert!(content.contains("0.000000"));
 }
 
+/// A sample whose variants are all filtered out is reference everywhere, not absent.
+/// It has to keep its row so the matrix stays N x N.
+#[test]
+fn sample_with_no_surviving_variants_keeps_its_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "keep1", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
+    write_vcf(dir.path(), "keep2", &[header, "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
+    write_vcf(dir.path(), "quiet", &[header, "chr1\t300\t.\tT\tC\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%"]);
+
+    let out = dir.path().join("out.csv");
+    let res = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("keep1.vcf").to_str().unwrap(),
+            dir.path().join("keep2.vcf").to_str().unwrap(),
+            dir.path().join("quiet.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--formula", "bray-curtis",
+            "--min-depth", "1", "--min-af", "0.5",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(res.status.success());
+    let content = fs::read_to_string(&out).unwrap();
+    assert_eq!(content.lines().count(), 4, "3 samples plus header:\n{}", content);
+    assert!(content.lines().any(|l| l.starts_with("quiet,")), "missing row:\n{}", content);
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(err.contains("no variants left after filtering"), "got: {}", err);
+}
+
+/// Sample names come from the file stem, so equal basenames would silently merge
+/// two samples into one row.
+#[test]
+fn duplicate_sample_names_are_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let (a, b) = (dir.path().join("a"), dir.path().join("b"));
+    fs::create_dir_all(&a).unwrap();
+    fs::create_dir_all(&b).unwrap();
+
+    write_vcf(&a, "s", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
+    write_vcf(&b, "s", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%"]);
+
+    let out = dir.path().join("out.csv");
+    let res = fstic_bin()
+        .args([
+            "--vcf",
+            a.join("s.vcf").to_str().unwrap(),
+            b.join("s.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!res.status.success());
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(err.contains("share the sample name"), "got: {}", err);
+}
+
 /// AD greater than DP would give a frequency above 1, which drives heterozygosity
 /// negative. The variant must be dropped and the drop reported.
 #[test]

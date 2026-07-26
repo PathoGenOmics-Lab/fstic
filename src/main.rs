@@ -50,8 +50,8 @@ fn run() -> Result<(), String> {
     // Read input files
     eprintln!("Reading {} input files...", files.len());
     let (position_set, mut variants_by_sample) = match input_mode {
-        InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria),
-        InputMode::Table => io::csv::read_csv_files(&files, &criteria),
+        InputMode::Vcf => io::vcf::read_vcf_files(&files, &criteria)?,
+        InputMode::Table => io::csv::read_csv_files(&files, &criteria)?,
     };
 
     // FASTA fallback for reference allele (chrom-aware)
