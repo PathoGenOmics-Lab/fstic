@@ -57,15 +57,84 @@ mod tests {
 
     #[test]
     fn freqs_no_ref() {
+        // REF unknown: the missing mass still has to go somewhere, so a placeholder
+        // reference allele carries it and the profile stays a distribution.
         let s1 = SiteData { reference_allele: String::new(), freqs: { let mut f = AlleleFrequencies::new(); f.insert("T".into(), 0.5); f } };
         let psf = get_all_freqs_at_pos(Some(&s1), None);
-        assert_eq!(psf.freqs1.len(), 1);
+        assert_eq!(psf.freqs1.len(), 2);
+        let sum: f64 = psf.freqs1.values().sum();
+        assert!((sum - 1.0).abs() < 1e-10);
     }
 
     #[test]
     fn freqs_both_none() {
+        // Site private to some other sample: both members of this pair are reference.
         let psf = get_all_freqs_at_pos(None, None);
-        assert!(psf.all_alleles.is_empty());
+        assert_eq!(psf.all_alleles.len(), 1);
+        let a = psf.all_alleles.iter().next().unwrap();
+        assert!((psf.freqs1[a] - 1.0).abs() < 1e-10);
+        assert!((psf.freqs2[a] - 1.0).abs() < 1e-10);
+    }
+
+    /// A locus where neither sample of the pair has a record is a locus where both are
+    /// reference, so it must add nothing to the cumulative metrics. Without this, a
+    /// pairwise distance changes when an unrelated sample joins the run.
+    ///
+    /// Nei's D and Rogers are excluded on purpose: both are defined over the whole
+    /// locus set (a ratio and a per-locus mean respectively), so a shared monomorphic
+    /// locus legitimately moves them. They are covered by
+    /// `identical_samples_zero_despite_foreign_loci` instead.
+    #[test]
+    fn absent_site_is_neutral_for_cumulative_metrics() {
+        let d1 = make_data(&[(100, "A", &[("T", 0.7)])]);
+        let d2 = make_data(&[(100, "A", &[("T", 0.2)])]);
+        let one = gps(&[100]);
+        // Position 999 is private to a third sample and absent from both d1 and d2.
+        let with_absent = gps(&[100, 999]);
+
+        macro_rules! same {
+            ($a:expr, $b:expr, $name:literal) => {
+                assert!(($a - $b).abs() < 1e-10, "{} changed when an absent locus was added: {} vs {}", $name, $a, $b);
+            };
+        }
+
+        use crate::calculation::*;
+        same!(fst::calculate_fst_for_pair(&d1, &d2, &one, false, 1),
+              fst::calculate_fst_for_pair(&d1, &d2, &with_absent, false, 2), "fst");
+        same!(gst::calculate_gst_for_pair(&d1, &d2, &one),
+              gst::calculate_gst_for_pair(&d1, &d2, &with_absent), "gst");
+        same!(chord::calculate_chord_distance_for_pair(&d1, &d2, &one, false, 1),
+              chord::calculate_chord_distance_for_pair(&d1, &d2, &with_absent, false, 2), "chord");
+        same!(bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &one, false, 1),
+              bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &with_absent, false, 2), "bray-curtis");
+        same!(jost_d::calculate_jost_d_for_pair(&d1, &d2, &one, false, 1),
+              jost_d::calculate_jost_d_for_pair(&d1, &d2, &with_absent, false, 2), "jost_d");
+        same!(reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &one),
+              reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &with_absent), "reynolds");
+    }
+
+    /// A shared monomorphic locus is genetic identity, so it can only pull Nei's D
+    /// down, never up.
+    #[test]
+    fn absent_site_adds_identity_to_nei() {
+        let d1 = make_data(&[(100, "A", &[("T", 0.7)])]);
+        let d2 = make_data(&[(100, "A", &[("T", 0.2)])]);
+        let near = crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100]));
+        let far = crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100, 999]));
+        assert!(far < near, "a shared monomorphic locus must reduce Nei's D: {} vs {}", far, near);
+        assert!(far > 0.0);
+    }
+
+    /// Two identical samples must be at distance 0 no matter how many loci the rest
+    /// of the cohort contributes.
+    #[test]
+    fn identical_samples_zero_despite_foreign_loci() {
+        let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
+        let d2 = make_data(&[(100, "A", &[("T", 1.0)])]);
+        let p = gps(&[100, 200, 300, 400]);
+        assert!(crate::calculation::chord::calculate_chord_distance_for_pair(&d1, &d2, &p, false, 4).abs() < 1e-10);
+        assert!(crate::calculation::gst::calculate_gst_for_pair(&d1, &d2, &p).abs() < 1e-10);
+        assert!(crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &p, 4).abs() < 1e-10);
     }
 
     #[test]

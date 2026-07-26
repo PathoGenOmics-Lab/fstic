@@ -1,6 +1,15 @@
 use crate::types::{AlleleFrequencies, SiteData};
 use std::collections::HashSet;
 
+/// Stand-in for the reference base at a site whose REF is unknown.
+///
+/// The position list is the union of variant sites over *all* samples, so for any
+/// given pair there are usually positions where neither member has a record. Both
+/// samples are reference there, but no REF allele was ever read for them. Angle
+/// brackets cannot occur in a called SNP allele, so this label never collides with
+/// real data.
+const UNKNOWN_REF: &str = "<REF>";
+
 /// Per-site frequency data for a pair of samples, with reference allele imputed.
 pub struct PairSiteFreqs {
     pub all_alleles: HashSet<String>,
@@ -10,7 +19,8 @@ pub struct PairSiteFreqs {
 
 /// Builds complete allele frequency profiles for two samples at a single site.
 ///
-/// For each sample the reference allele frequency is imputed as `1 - sum(alt_freqs)`.
+/// For each sample the reference allele frequency is imputed as `1 - sum(alt_freqs)`,
+/// so a sample with no record at the site is treated as homozygous reference.
 /// Returns the union of all alleles observed plus both frequency maps.
 pub fn get_all_freqs_at_pos(
     site1_data: Option<&SiteData>,
@@ -20,13 +30,15 @@ pub fn get_all_freqs_at_pos(
     let mut freqs1 = AlleleFrequencies::new();
     let mut freqs2 = AlleleFrequencies::new();
 
-    // Determine the reference allele from whichever sample has it
+    // Determine the reference allele from whichever sample has it. Neither sample
+    // having a record here means the site is private to some other sample: both are
+    // reference, so a placeholder keeps the profiles complete and the site neutral.
     let ref_allele = site1_data
         .map(|d| &d.reference_allele)
         .filter(|r| !r.is_empty())
         .or_else(|| site2_data.map(|d| &d.reference_allele).filter(|r| !r.is_empty()))
         .cloned()
-        .unwrap_or_default();
+        .unwrap_or_else(|| UNKNOWN_REF.to_string());
 
     if let Some(data) = site1_data {
         freqs1.clone_from(&data.freqs);
@@ -38,21 +50,19 @@ pub fn get_all_freqs_at_pos(
         all_alleles.extend(data.freqs.keys().cloned());
     }
 
-    if !ref_allele.is_empty() {
-        all_alleles.insert(ref_allele.clone());
+    all_alleles.insert(ref_allele.clone());
 
-        // Only impute ref freq if the sample doesn't already have an explicit
-        // frequency for the ref allele (e.g. from table input where ref is
-        // listed as an allele with its own frequency).
-        if !freqs1.contains_key(&ref_allele) {
-            let sum1: f64 = freqs1.values().sum();
-            freqs1.insert(ref_allele.clone(), (1.0 - sum1).max(0.0));
-        }
+    // Only impute ref freq if the sample doesn't already have an explicit
+    // frequency for the ref allele (e.g. from table input where ref is
+    // listed as an allele with its own frequency).
+    if !freqs1.contains_key(&ref_allele) {
+        let sum1: f64 = freqs1.values().sum();
+        freqs1.insert(ref_allele.clone(), (1.0 - sum1).max(0.0));
+    }
 
-        if !freqs2.contains_key(&ref_allele) {
-            let sum2: f64 = freqs2.values().sum();
-            freqs2.insert(ref_allele, (1.0 - sum2).max(0.0));
-        }
+    if !freqs2.contains_key(&ref_allele) {
+        let sum2: f64 = freqs2.values().sum();
+        freqs2.insert(ref_allele, (1.0 - sum2).max(0.0));
     }
 
     PairSiteFreqs {
