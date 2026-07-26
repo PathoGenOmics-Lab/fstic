@@ -58,21 +58,53 @@ fn run() -> Result<(), String> {
     // Only update samples that already have an entry at this position,
     // to avoid creating phantom empty entries for every sample×position.
     if let Some(ref genome) = reference {
+        // A single-contig reference is unambiguous, so a contig name that does not
+        // match (a table with no chrom column, or "Chromosome" vs "NC_000962.3")
+        // still resolves. With several contigs there is nothing to guess from, and
+        // silently reading the wrong contig's base corrupts every distance.
+        let single_contig = genome.len() == 1;
+        let mut unknown_chroms: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        let mut out_of_range = 0usize;
+
         for gpos in &position_set {
-            // Pre-compute the base once per position
-            let base = genome.get(&gpos.chrom)
-                .and_then(|seq| seq.get(gpos.pos.saturating_sub(1)).copied())
-                .or_else(|| io::fasta::get_base_at(genome, gpos.pos));
-            if let Some(b) = base {
-                let ref_str = String::from(b as char);
-                for sample_data in variants_by_sample.values_mut() {
-                    if let Some(site) = sample_data.get_mut(gpos) {
-                        if site.reference_allele.is_empty() {
-                            site.reference_allele = ref_str.clone();
-                        }
+            let seq = match genome.get(&gpos.chrom) {
+                Some(seq) => Some(seq),
+                None if single_contig => genome.values().next(),
+                None => {
+                    unknown_chroms.insert(gpos.chrom.as_str());
+                    continue;
+                }
+            };
+            let base = seq.and_then(|s| s.get(gpos.pos.saturating_sub(1)).copied());
+            let Some(b) = base else {
+                out_of_range += 1;
+                continue;
+            };
+            let ref_str = String::from(b as char);
+            for sample_data in variants_by_sample.values_mut() {
+                if let Some(site) = sample_data.get_mut(gpos) {
+                    if site.reference_allele.is_empty() {
+                        site.reference_allele = ref_str.clone();
                     }
                 }
             }
+        }
+
+        if !unknown_chroms.is_empty() {
+            let names: Vec<&str> = unknown_chroms.iter().copied().take(5).collect();
+            eprintln!(
+                "Warning: {} contig name(s) absent from the reference FASTA ({}{}). \
+                 Reference alleles were not imputed there.",
+                unknown_chroms.len(),
+                names.join(", "),
+                if unknown_chroms.len() > names.len() { ", ..." } else { "" }
+            );
+        }
+        if out_of_range > 0 {
+            eprintln!(
+                "Warning: {} position(s) fall beyond the end of their contig in the reference FASTA.",
+                out_of_range
+            );
         }
     }
 

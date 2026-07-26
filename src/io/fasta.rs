@@ -43,11 +43,3 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
 
     Ok(genome)
 }
-
-/// Gets a base at 1-based position from the first (lexicographically) contig.
-///
-/// Deterministic because `BTreeMap` iterates in sorted key order.
-/// Suitable for single-contig references used in VCF mode.
-pub fn get_base_at(genome: &ReferenceGenome, pos: usize) -> Option<u8> {
-    genome.values().next().and_then(|seq| seq.get(pos.saturating_sub(1)).copied())
-}

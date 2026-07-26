@@ -458,7 +458,8 @@ mod tests {
         let p = dir.path().join("ref.fa");
         std::fs::write(&p, ">z_last\nGGGG\n>a_first\nACGT\n").unwrap();
         let g = crate::io::fasta::read_reference(p.to_str().unwrap()).unwrap();
-        assert_eq!(crate::io::fasta::get_base_at(&g, 1), Some(b'A'));
+        let names: Vec<&str> = g.keys().map(|s| s.as_str()).collect();
+        assert_eq!(names, vec!["a_first", "z_last"]);
     }
 
     #[test]
