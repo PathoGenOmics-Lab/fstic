@@ -93,6 +93,8 @@ cargo build --release  # binary at ./target/release/fstic
 | `--min-depth <INT>`      | 30                          | Filter out variants whose total depth < this value.                                                  |
 | `--min-af <FLOAT>`       | 0.05                        | Filter out variants whose alt‑allele frequency < this value.                                         |
 | `--min-alt-reads <INT>`  | 2                           | Filter out variants with fewer supporting alt reads.                                                 |
+| `--min-alt-rev-reads <INT>` | 2                        | Filter out variants with fewer supporting alt reads on the reverse strand.                           |
+| `--pass-only`            | *off*                       | Keep only variants whose VCF `FILTER` column is `PASS` or `.`.                                       |
 | `--workers <INT>`        | *all logical cores*         | Number of threads to spawn.                                                                          |
 | `--help`                 | –                           | Print the full help message.                                                                         |
 
@@ -104,15 +106,15 @@ cargo build --release  # binary at ./target/release/fstic
 
 | Name (`--formula`) | Global Formula                                                                                                 | Notes & Recommended Use                                                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **GST**            | \$G\_{ST} = \dfrac{H\_T - H\_S}{H\_T}\$                                                                        | Classic overall differentiation (Nei 1973).                                                                                      |
-| **FST**            | \$F\_{ST} = \dfrac{\sum\_l (H\_{T,l}-H\_{S,l})}{\sum\_l H\_{T,l}}\$ <br>*(ratio‑of‑sums Nei G_ST)* | Per-locus Nei GST summed across sites (not Weir & Cockerham theta). Default for relative differentiation.                                                    |
+| **GST**            | \$G\_{ST} = \dfrac{\sum\_l (H\_{T,l}-H\_{S,l})}{\sum\_l H\_{T,l}}\$ <br>*(ratio‑of‑sums)* | Classic overall differentiation (Nei 1973). Bounded in [0, 1]; unaffected by `--normalize`. |
+| **FST**            | \$F\_{ST} = \sum\_l \dfrac{H\_{T,l}-H\_{S,l}}{H\_{T,l}}\$ <br>*(sum of per‑locus \$G\_{ST}\$)* | Per‑locus Nei \$G\_{ST}\$ summed over sites, so it grows with the number of loci; pass `--normalize` for the mean. Not the Weir & Cockerham \$\theta\$ estimator. Default. |
 | **Jost’s D**       | \$D = \dfrac{n}{n-1} \cdot \dfrac{H\_T - H\_S}{1 - H\_S}\$                                                                          | Measures the fraction of allelic diversity that is partitioned among populations; less sensitive to within‑population variation. |
 
 ### Metrics for Phylogenetic / Divergence Analysis
 
 | Name (`--formula`)         | Formula                                                       | Notes                                                                         |
 | -------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Reynolds**               | \$D\_R = -\ln(1 - \theta)\$                                   | Linear with drift time for recently diverged populations.                     |
+| **Reynolds**               | \$D\_R = -\ln(1 - \theta)\$, with <br>\$\theta = \dfrac{\sum\_l \sum\_i (p\_i-q\_i)^2 / 2}{\sum\_l \left(1 - \sum\_i p\_i q\_i\right)}\$ | Reynolds, Weir & Cockerham (1983) coancestry coefficient. Linear with drift time for recently diverged populations. |
 | **Nei’s D**                | \$D = -\ln \left( \dfrac{J\_{xy}}{\sqrt{J\_x J\_y}} \right)\$ | Effective over long time‑scales; \$J\$ = probability of allele identity.      |
 | **Cavalli‑Sforza “Chord”** | \$D\_{CH} = \sqrt{,2\bigl(1-\sum\_i \sqrt{p\_i q\_i}\bigr)}\$ | Geometric distance satisfying triangle inequality; useful for tree inference. |
 | **Rogers**                 | \$D\_{R} = \sqrt{\dfrac{\sum\_i (p\_i-q\_i)^2}{2L}}\$         | Euclidean‑based distance bounded between 0 and 1.                             |
@@ -133,7 +135,7 @@ cargo build --release  # binary at ./target/release/fstic
 
 * **One file per sample** (single‑sample VCF). Sample name is taken from the filename.
 * Requires `FORMAT/FREQ` field (supports decimal **or** percentage). Optionally uses `DP`, `AD`, `ADR` for filtering.
-* Indels fully supported.
+* SNPs only. Indels, multi‑allelic records (`ALT` with a comma), `ALT=.` and `ALT=*` are skipped, and the counts are reported at the end of the run.
 * `--reference` **not** required in VCF mode: REF allele is part of the file.
 
 **Example 1 — VCF with all filtering fields**
@@ -142,8 +144,12 @@ cargo build --release  # binary at ./target/release/fstic
 ##fileformat=VCFv4.2
 #CHROM POS  ID REF ALT QUAL FILTER INFO FORMAT        sample_A
 chr1    100 .  A   T   .    .      .    GT:DP:AD:FREQ 0/1:50:24:48.0%
-chr1    250 .  C   CAA .    .      .    GT:DP:AD:FREQ 0/1:45:10:22.2%
+chr1    250 .  C   G   .    .      .    GT:DP:AD:FREQ 0/1:45:10:22.2%
 ```
+
+`AD` is read as the standard `ref,alt` pair when it carries a comma, and as a bare
+alt count otherwise, which is what VarScan writes. When `FREQ` is absent it is
+computed from `AD/DP`.
 
 **Example 2 — VCF missing DP/AD but with FREQ only**
 
@@ -158,9 +164,11 @@ chr1    100 .  A   T   .    .      .    GT:FREQ 0/1:85.0%
 ### Table (`.csv`, `.tsv`, `.tab`)
 
 * **Required columns:** `sample`, `position`, `sequence` (alt allele), `frequency`.
-* **Recommended:** `ref_allele` (crucial for indels).
+* **Recommended:** `ref_allele`. Without it the reference base is taken from `--reference`.
 * **Optional filtering columns:** `total_dp`, `alt_dp`, `alt_rv`.
+* Optional `chrom` column. Either every input table has it or none does; mixing the two is rejected, since the same site would otherwise be counted twice.
 * Column names are case‑insensitive; delimiter auto‑detected from extension.
+* `frequency` accepts a proportion (`0.5`) or a percentage (`50%`), as in VCF `FREQ`. A bare number is always a proportion.
 
 **Example 1 — CSV with all columns**
 
