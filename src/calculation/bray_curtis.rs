@@ -1,6 +1,5 @@
-use super::common::get_all_freqs_at_pos;
+use super::common::{get_all_freqs_at_pos, sum_per_locus};
 use crate::types::{GenomicPos, PositionalData};
-use rayon::prelude::*;
 
 /// Calculates Bray-Curtis dissimilarity: BC = 0.5 Σ |p_i − q_i|.
 ///
@@ -12,18 +11,15 @@ pub fn calculate_bray_curtis_for_pair(
     normalize: bool,
     num_loci: usize,
 ) -> f64 {
-    let sum_dist: f64 = all_positions
-        .par_iter()
-        .map(|pos| {
-            let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
-            let abs_diff: f64 = psf.all_alleles.iter().map(|a| {
-                let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
-                let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
-                (p - q).abs()
-            }).sum();
-            0.5 * abs_diff
-        })
-        .sum();
+    let sum_dist = sum_per_locus(all_positions, |pos| {
+        let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
+        let abs_diff: f64 = psf.all_alleles.iter().map(|a| {
+            let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+            let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+            (p - q).abs()
+        }).sum();
+        0.5 * abs_diff
+    });
 
     if normalize && num_loci > 0 { sum_dist / num_loci as f64 } else { sum_dist }
 }

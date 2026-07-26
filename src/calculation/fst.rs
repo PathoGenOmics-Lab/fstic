@@ -1,6 +1,5 @@
-use super::common::{get_all_freqs_at_pos, heterozygosity, pooled_heterozygosity};
+use super::common::{get_all_freqs_at_pos, heterozygosity, pooled_heterozygosity, sum_per_locus};
 use crate::types::{GenomicPos, PositionalData};
-use rayon::prelude::*;
 
 /// Calculates FST as sum-of-per-site Nei's GST: Σ (Ht - Hs) / Ht.
 ///
@@ -13,15 +12,12 @@ pub fn calculate_fst_for_pair(
     normalize: bool,
     num_loci: usize,
 ) -> f64 {
-    let sum_fsts: f64 = all_positions
-        .par_iter()
-        .map(|pos| {
-            let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
-            let h_s = (heterozygosity(&psf.freqs1) + heterozygosity(&psf.freqs2)) / 2.0;
-            let h_t = pooled_heterozygosity(&psf);
-            if h_t > 0.0 { (h_t - h_s) / h_t } else { 0.0 }
-        })
-        .sum();
+    let sum_fsts = sum_per_locus(all_positions, |pos| {
+        let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
+        let h_s = (heterozygosity(&psf.freqs1) + heterozygosity(&psf.freqs2)) / 2.0;
+        let h_t = pooled_heterozygosity(&psf);
+        if h_t > 0.0 { (h_t - h_s) / h_t } else { 0.0 }
+    });
 
     if normalize && num_loci > 0 {
         sum_fsts / num_loci as f64

@@ -565,6 +565,52 @@ fn unparseable_ad_is_reported() {
     );
 }
 
+/// Output must not depend on the thread count: a 4-core and a 16-core machine
+/// running the same command have to produce the same file.
+#[test]
+fn output_is_independent_of_worker_count() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    // Enough loci, at irregular frequencies, for the summation order to show up.
+    let mut a = vec![header.to_string()];
+    let mut b = vec![header.to_string()];
+    for pos in 1..4000 {
+        let fa = 3.0 + (pos as f64 * 7.3) % 91.0;
+        let fb = 2.0 + (pos as f64 * 11.7) % 93.0;
+        a.push(format!("chr1\t{}\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:{:.6}%", pos, fa));
+        b.push(format!("chr1\t{}\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:{:.6}%", pos, fb));
+    }
+    let a_ref: Vec<&str> = a.iter().map(|s| s.as_str()).collect();
+    let b_ref: Vec<&str> = b.iter().map(|s| s.as_str()).collect();
+    write_vcf(dir.path(), "wa", &a_ref);
+    write_vcf(dir.path(), "wb", &b_ref);
+
+    let run = |workers: &str, name: &str| -> String {
+        let out = dir.path().join(name);
+        let status = fstic_bin()
+            .args([
+                "--vcf",
+                dir.path().join("wa.vcf").to_str().unwrap(),
+                dir.path().join("wb.vcf").to_str().unwrap(),
+                "-o", out.to_str().unwrap(),
+                "--formula", "fst",
+                "--workers", workers,
+                "--min-depth", "1", "--min-af", "0.01",
+                "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        fs::read_to_string(&out).unwrap()
+    };
+
+    let one = run("1", "w1.csv");
+    for (workers, name) in [("2", "w2.csv"), ("3", "w3.csv"), ("8", "w8.csv")] {
+        assert_eq!(one, run(workers, name), "--workers {} changed the output", workers);
+    }
+}
+
 /// --pass-only should skip non-PASS variants.
 #[test]
 fn pass_only_filter() {

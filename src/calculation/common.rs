@@ -1,5 +1,57 @@
-use crate::types::{AlleleFrequencies, SiteData};
+use crate::types::{AlleleFrequencies, GenomicPos, SiteData};
+use rayon::prelude::*;
 use std::collections::HashSet;
+
+/// Loci per reduction chunk.
+///
+/// rayon splits an indexed iterator according to the current thread count and work
+/// stealing, so a plain `par_iter().sum()` adds the per-locus terms in an order that
+/// varies with `--workers`. Floating point addition is not associative, so the same
+/// input gave different output bytes on different machines: on 320k loci, `-w 3`
+/// produced 91356.2127736697 where every other thread count gave ...699.
+///
+/// A fixed chunk size makes the summation tree a function of the input length alone.
+const REDUCTION_CHUNK: usize = 4096;
+
+/// Sums a per-locus quantity in an order that does not depend on the thread count.
+pub fn sum_per_locus<F>(all_positions: &[GenomicPos], per_locus: F) -> f64
+where
+    F: Fn(&GenomicPos) -> f64 + Sync + Send,
+{
+    all_positions
+        .par_chunks(REDUCTION_CHUNK)
+        .map(|chunk| chunk.iter().map(&per_locus).sum::<f64>())
+        .collect::<Vec<f64>>()
+        .into_iter()
+        .sum()
+}
+
+/// Same as [`sum_per_locus`] for metrics that accumulate several running totals.
+pub fn sum_per_locus_n<const N: usize, F>(all_positions: &[GenomicPos], per_locus: F) -> [f64; N]
+where
+    F: Fn(&GenomicPos) -> [f64; N] + Sync + Send,
+{
+    all_positions
+        .par_chunks(REDUCTION_CHUNK)
+        .map(|chunk| {
+            let mut acc = [0.0_f64; N];
+            for pos in chunk {
+                let terms = per_locus(pos);
+                for (a, t) in acc.iter_mut().zip(terms) {
+                    *a += t;
+                }
+            }
+            acc
+        })
+        .collect::<Vec<[f64; N]>>()
+        .into_iter()
+        .fold([0.0_f64; N], |mut acc, chunk| {
+            for (a, t) in acc.iter_mut().zip(chunk) {
+                *a += t;
+            }
+            acc
+        })
+}
 
 /// Stand-in for the reference base at a site whose REF is unknown.
 ///

@@ -1,6 +1,5 @@
-use super::common::get_all_freqs_at_pos;
+use super::common::{get_all_freqs_at_pos, sum_per_locus};
 use crate::types::{GenomicPos, PositionalData};
-use rayon::prelude::*;
 
 /// Calculates Cavalli-Sforza & Edwards' chord distance.
 ///
@@ -13,19 +12,16 @@ pub fn calculate_chord_distance_for_pair(
     normalize: bool,
     num_loci: usize,
 ) -> f64 {
-    let sum_dist: f64 = all_positions
-        .par_iter()
-        .map(|pos| {
-            let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
-            let sum_sqrt: f64 = psf.all_alleles.iter().map(|a| {
-                let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
-                let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
-                (p * q).sqrt()
-            }).sum();
-            let term = 2.0 * (1.0 - sum_sqrt);
-            if term > 0.0 { term.sqrt() } else { 0.0 }
-        })
-        .sum();
+    let sum_dist = sum_per_locus(all_positions, |pos| {
+        let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
+        let sum_sqrt: f64 = psf.all_alleles.iter().map(|a| {
+            let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+            let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+            (p * q).sqrt()
+        }).sum();
+        let term = 2.0 * (1.0 - sum_sqrt);
+        if term > 0.0 { term.sqrt() } else { 0.0 }
+    });
 
     if normalize && num_loci > 0 { sum_dist / num_loci as f64 } else { sum_dist }
 }
