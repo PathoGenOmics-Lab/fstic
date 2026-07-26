@@ -427,8 +427,49 @@ mod tests {
     fn matrix_symmetric() {
         let r = vec![((0, 1), 0.5), ((0, 2), 0.3), ((1, 2), 0.7)];
         let m = crate::calculation::create_distance_matrix(&r, 3);
-        assert_eq!(m[0][1], m[1][0]);
-        assert_eq!(m[0][0], 0.0);
+
+        // m[0][1] == m[1][0] holds even if both cells hold the wrong number, so check
+        // the values that went in actually came back out.
+        assert_eq!(m[0][1], 0.5);
+        assert_eq!(m[1][0], 0.5);
+        assert_eq!(m[0][2], 0.3);
+        assert_eq!(m[2][0], 0.3);
+        assert_eq!(m[1][2], 0.7);
+        assert_eq!(m[2][1], 0.7);
+        for i in 0..3 {
+            assert_eq!(m[i][i], 0.0, "diagonal at {}", i);
+        }
+    }
+
+    #[test]
+    fn quote_field_protects_separators() {
+        use crate::io::csv::write_distance_matrix;
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out.csv");
+        let m = vec![vec![0.0, 0.5], vec![0.5, 0.0]];
+        let samples = vec!["with,comma".to_string(), "he said \"hi\"".to_string()];
+        write_distance_matrix(out.to_str().unwrap(), &m, &samples, false).unwrap();
+
+        let c = std::fs::read_to_string(&out).unwrap();
+        assert!(c.contains("\"with,comma\""), "got: {}", c);
+        // Embedded quotes are doubled, per RFC 4180
+        assert!(c.contains("\"he said \"\"hi\"\"\""), "got: {}", c);
+    }
+
+    #[test]
+    fn non_finite_cells_written_as_na() {
+        use crate::io::csv::write_distance_matrix;
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out.csv");
+        let m = vec![
+            vec![0.0, f64::INFINITY],
+            vec![f64::INFINITY, 0.0],
+        ];
+        write_distance_matrix(out.to_str().unwrap(), &m, &["A".into(), "B".into()], false).unwrap();
+
+        let c = std::fs::read_to_string(&out).unwrap();
+        assert!(c.contains("A,0.0000000000,NA"), "got: {}", c);
+        assert!(!c.to_lowercase().contains("inf"), "got: {}", c);
     }
 
     #[test]

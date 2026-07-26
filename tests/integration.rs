@@ -60,8 +60,9 @@ fn identical_samples_zero_distance() {
 
     assert!(status.success());
     let content = fs::read_to_string(&out).unwrap();
-    // Both off-diagonal should be 0
-    assert!(content.contains("0.000000"));
+    // The diagonal is hard-coded to 0, so a substring check would pass on any
+    // matrix at all. Read the off-diagonal cell.
+    assert_eq!(off_diagonal(&content, ','), 0.0, "matrix was:\n{}", content);
 }
 
 /// Completely different samples should produce FST > 0.
@@ -236,11 +237,75 @@ fn non_variant_and_star_skipped() {
     ]);
 
     let out = dir.path().join("out.csv");
-    let status = fstic_bin()
+    let res = fstic_bin()
         .args([
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--formula", "bray-curtis",
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(res.status.success());
+    // Exactly one usable site, chr1:300. Asserting the sample name appears would be
+    // satisfied by the header alone.
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(err.contains("1 polymorphic sites"), "got: {}", err);
+    // 0.5 against 0.3 over one locus
+    let content = fs::read_to_string(&out).unwrap();
+    assert!((off_diagonal(&content, ',') - 0.2).abs() < 1e-12, "matrix was:\n{}", content);
+}
+
+/// Nei and Reynolds return infinity for a fixed difference, which has to reach the
+/// file as NA rather than "inf" for R and pandas to read it.
+#[test]
+fn non_finite_distance_is_written_as_na() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "fixA", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t1/1:100:100%"]);
+    write_vcf(dir.path(), "fixB", &[header, "chr1\t100\t.\tA\tG\t.\t.\t.\tGT:DP:FREQ\t1/1:100:100%"]);
+
+    let out = dir.path().join("out.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("fixA.vcf").to_str().unwrap(),
+            dir.path().join("fixB.vcf").to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--formula", "nei",
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+
+    assert!(status.success());
+    let content = fs::read_to_string(&out).unwrap();
+    assert!(content.contains("NA"), "expected NA, got:\n{}", content);
+    assert!(!content.to_lowercase().contains("inf"), "got:\n{}", content);
+}
+
+/// A sample name containing the output separator has to be quoted, or the matrix
+/// gains a column and every downstream parser misreads it.
+#[test]
+fn sample_names_containing_the_separator_are_quoted() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+
+    write_vcf(dir.path(), "with,comma", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
+    write_vcf(dir.path(), "plain", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%"]);
+
+    let out = dir.path().join("out.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("with,comma.vcf").to_str().unwrap(),
+            dir.path().join("plain.vcf").to_str().unwrap(),
             "-o", out.to_str().unwrap(),
             "--min-depth", "1", "--min-af", "0.01",
             "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
@@ -250,24 +315,34 @@ fn non_variant_and_star_skipped() {
 
     assert!(status.success());
     let content = fs::read_to_string(&out).unwrap();
-    // Should have computed distances with only 1 SNP at pos 300
-    assert!(content.contains("s1"));
+    assert!(content.contains("\"with,comma\""), "name was not quoted:\n{}", content);
+    // Header plus two rows, each with 3 fields once quoting is honoured
+    for line in content.lines() {
+        let fields = line.matches(',').count() - line.matches("\"with,comma\"").count();
+        assert_eq!(fields, 2, "row has the wrong field count: {}", line);
+    }
 }
 
-/// FREQ computed from AD/DP when FREQ field is missing.
+/// FREQ computed from AD/DP when the FREQ field is missing.
+///
+/// AD is "ref,alt", so the second component is the one to use. A symmetric fixture
+/// like AD=50,50 in both samples cannot catch a ref/alt swap, and neither can two
+/// samples with mirrored values, since the distance is the same either way. Pairing
+/// an AD-derived frequency against an explicit FREQ pins the absolute value.
 #[test]
 fn freq_from_ad_dp() {
     let dir = tempfile::tempdir().unwrap();
     let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    // No FREQ field — should compute from AD/DP
+    // AD=20,80 means 80 alt reads out of 100, i.e. 0.8
     write_vcf(dir.path(), "s1", &[
         header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:50,50",
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:20,80",
     ]);
+    // Same frequency, stated outright
     write_vcf(dir.path(), "s2", &[
         header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:50,50",
+        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:80%",
     ]);
 
     let out = dir.path().join("out.csv");
@@ -277,6 +352,7 @@ fn freq_from_ad_dp() {
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
             "-o", out.to_str().unwrap(),
+            "--formula", "bray-curtis",
             "--min-depth", "1", "--min-af", "0.01",
             "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
         ])
@@ -285,8 +361,8 @@ fn freq_from_ad_dp() {
 
     assert!(status.success());
     let content = fs::read_to_string(&out).unwrap();
-    // Same freq → distance = 0
-    assert!(content.contains("0.000000"));
+    // Reading AD as the ref depth would give 0.2 against 0.8, i.e. 0.6 here.
+    assert_eq!(off_diagonal(&content, ','), 0.0, "matrix was:\n{}", content);
 }
 
 fn write_ref(dir: &Path) -> std::path::PathBuf {
