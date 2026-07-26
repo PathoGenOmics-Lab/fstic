@@ -360,6 +360,29 @@ mod tests {
         assert!(crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100])).is_infinite());
     }
 
+    /// At intermediate frequencies the coancestry estimator and Nei's GST diverge, so
+    /// this is the case that tells them apart. Substituting GST would give 0.4054651.
+    #[test]
+    fn reynolds_uses_coancestry_not_gst() {
+        // p = {T:0.5, A:0.5} vs q = {T:1.0, A:0.0}
+        // theta = ((0.5)^2 + (0.5)^2)/2 / (1 - 0.5) = 0.25/0.5 = 0.5
+        let d1 = make_data(&[(100, "A", &[("T", 0.5)])]);
+        let d2 = make_data(&[(100, "A", &[("T", 1.0)])]);
+        let d = crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100]));
+        assert!((d - (2.0_f64).ln()).abs() < 1e-10, "expected -ln(0.5), got {}", d);
+    }
+
+    #[test]
+    fn reynolds_symmetric() {
+        let d1 = make_data(&[(100, "A", &[("T", 0.7)]), (200, "C", &[("G", 0.1)])]);
+        let d2 = make_data(&[(100, "A", &[("T", 0.2)]), (200, "C", &[("G", 0.9)])]);
+        let p = gps(&[100, 200]);
+        let a = crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &p);
+        let b = crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d2, &d1, &p);
+        assert!((a - b).abs() < 1e-10);
+        assert!(a > 0.0);
+    }
+
     // ── Rogers ──────────────────────────────────────────────────────────
 
     #[test]
