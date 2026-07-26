@@ -41,10 +41,13 @@ pub struct FilterCriteria {
 #[derive(Debug, serde::Deserialize)]
 pub struct TableInputRow {
     pub sample: String,
-    #[serde(default = "default_chrom")]
-    pub chrom: String,
+    /// `None` when the table carries no `chrom` column. Kept distinct from a real
+    /// contig name so that mixing tables with and without one can be detected.
+    #[serde(default)]
+    pub chrom: Option<String>,
     pub position: usize,
     pub sequence: String,
+    #[serde(deserialize_with = "de_frequency")]
     pub frequency: f64,
     pub ref_allele: Option<String>,
     pub total_dp: Option<u32>,
@@ -52,6 +55,19 @@ pub struct TableInputRow {
     pub alt_rv: Option<u32>,
 }
 
-fn default_chrom() -> String {
-    ".".to_string()
+/// Accepts a proportion (`0.125`) or a percentage (`12.5%`), matching the VCF FREQ
+/// field. A bare number is always a proportion: guessing from magnitude would turn a
+/// column mistakenly holding read counts into plausible-looking frequencies.
+fn de_frequency<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let raw = String::deserialize(deserializer)?;
+    let s = raw.trim();
+    let parsed = match s.strip_suffix('%') {
+        Some(stripped) => stripped.trim().parse::<f64>().map(|f| f / 100.0),
+        None => s.parse::<f64>(),
+    };
+    parsed.map_err(|_| serde::de::Error::custom(format!("invalid frequency '{}'", raw)))
 }

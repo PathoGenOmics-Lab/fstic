@@ -289,6 +289,143 @@ fn freq_from_ad_dp() {
     assert!(content.contains("0.000000"));
 }
 
+fn write_ref(dir: &Path) -> std::path::PathBuf {
+    let p = dir.join("ref.fa");
+    fs::write(&p, format!(">chr1\n{}\n", "A".repeat(500))).unwrap();
+    p
+}
+
+fn run_table(dir: &Path, body: &str, extra: &[&str]) -> (std::process::Output, std::path::PathBuf) {
+    let table = dir.join("t.csv");
+    fs::write(&table, body).unwrap();
+    let reference = write_ref(dir);
+    let out = dir.join("out.csv");
+    let mut args: Vec<String> = vec![
+        "--table".into(), table.to_str().unwrap().into(),
+        "-r".into(), reference.to_str().unwrap().into(),
+        "-o".into(), out.to_str().unwrap().into(),
+        "--min-depth".into(), "1".into(),
+        "--min-af".into(), "0.01".into(),
+        "--min-alt-reads".into(), "1".into(),
+        "--min-alt-rev-reads".into(), "0".into(),
+    ];
+    args.extend(extra.iter().map(|s| s.to_string()));
+    (fstic_bin().args(&args).output().unwrap(), out)
+}
+
+/// Table mode must agree with VCF mode on the same underlying data.
+#[test]
+fn table_matches_vcf_on_equivalent_data() {
+    let dir = tempfile::tempdir().unwrap();
+    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    write_vcf(dir.path(), "sA", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:50%"]);
+    write_vcf(dir.path(), "sB", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:80%"]);
+
+    let vcf_out = dir.path().join("vcf.csv");
+    let status = fstic_bin()
+        .args([
+            "--vcf",
+            dir.path().join("sA.vcf").to_str().unwrap(),
+            dir.path().join("sB.vcf").to_str().unwrap(),
+            "-o", vcf_out.to_str().unwrap(),
+            "--formula", "chord",
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let (res, table_out) = run_table(
+        dir.path(),
+        "sample,chrom,position,ref_allele,sequence,frequency\n\
+         sA,chr1,100,A,T,0.5\n\
+         sB,chr1,100,A,T,0.8\n",
+        &["--formula", "chord"],
+    );
+    assert!(res.status.success(), "{}", String::from_utf8_lossy(&res.stderr));
+
+    let from_vcf = off_diagonal(&fs::read_to_string(&vcf_out).unwrap(), ',');
+    let from_table = off_diagonal(&fs::read_to_string(&table_out).unwrap(), ',');
+    assert!((from_vcf - from_table).abs() < 1e-12, "{} vs {}", from_vcf, from_table);
+}
+
+/// The README promises case-insensitive column names.
+#[test]
+fn table_headers_are_case_insensitive() {
+    let dir = tempfile::tempdir().unwrap();
+    let (res, out) = run_table(
+        dir.path(),
+        "Sample,Position,Ref_Allele,Sequence,Frequency\n\
+         sA,100,A,T,0.5\n\
+         sB,100,A,T,0.8\n",
+        &["--formula", "bray-curtis"],
+    );
+    assert!(res.status.success(), "{}", String::from_utf8_lossy(&res.stderr));
+    assert!((off_diagonal(&fs::read_to_string(&out).unwrap(), ',') - 0.3).abs() < 1e-12);
+}
+
+/// Percentages are auto-detected in the VCF FREQ field, so tables must match.
+#[test]
+fn table_accepts_percentage_frequencies() {
+    let dir = tempfile::tempdir().unwrap();
+    let (res, out) = run_table(
+        dir.path(),
+        "sample,position,ref_allele,sequence,frequency\n\
+         sA,100,A,T,50%\n\
+         sB,100,A,T,80%\n",
+        &["--formula", "bray-curtis"],
+    );
+    assert!(res.status.success(), "{}", String::from_utf8_lossy(&res.stderr));
+    assert!((off_diagonal(&fs::read_to_string(&out).unwrap(), ',') - 0.3).abs() < 1e-12);
+}
+
+/// Contradictory duplicate rows keep the first value, like the VCF reader, and say so.
+#[test]
+fn table_duplicate_rows_keep_first_and_warn() {
+    let dir = tempfile::tempdir().unwrap();
+    let (res, out) = run_table(
+        dir.path(),
+        "sample,position,ref_allele,sequence,frequency\n\
+         sA,100,A,T,0.5\n\
+         sA,100,A,T,0.9\n\
+         sB,100,A,T,0.8\n",
+        &["--formula", "bray-curtis"],
+    );
+    assert!(res.status.success());
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(err.contains("duplicate"), "got: {}", err);
+    // 0.5 kept, not 0.9
+    assert!((off_diagonal(&fs::read_to_string(&out).unwrap(), ',') - 0.3).abs() < 1e-12);
+}
+
+/// Mixing tables with and without a chrom column would split one site into two loci.
+#[test]
+fn table_mixed_chrom_column_is_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let reference = write_ref(dir.path());
+    let a = dir.path().join("a.csv");
+    let b = dir.path().join("b.csv");
+    fs::write(&a, "sample,chrom,position,ref_allele,sequence,frequency\nsA,chr1,100,A,T,0.5\n").unwrap();
+    fs::write(&b, "sample,position,ref_allele,sequence,frequency\nsB,100,A,T,0.8\n").unwrap();
+
+    let out = dir.path().join("out.csv");
+    let res = fstic_bin()
+        .args([
+            "--table", a.to_str().unwrap(), b.to_str().unwrap(),
+            "-r", reference.to_str().unwrap(),
+            "-o", out.to_str().unwrap(),
+            "--min-depth", "1", "--min-af", "0.01",
+            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!res.status.success());
+    let err = String::from_utf8_lossy(&res.stderr);
+    assert!(err.contains("chrom"), "got: {}", err);
+}
+
 /// A sample whose variants are all filtered out is reference everywhere, not absent.
 /// It has to keep its row so the matrix stays N x N.
 #[test]

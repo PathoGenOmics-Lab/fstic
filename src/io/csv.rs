@@ -11,53 +11,49 @@ pub fn read_csv_files(
     files: &[PathBuf],
     criteria: &FilterCriteria,
 ) -> Result<(HashSet<GenomicPos>, SampleVariants), String> {
-    let error_count = AtomicUsize::new(0);
+    let out_of_range = AtomicUsize::new(0);
 
-    let all_rows: Vec<TableInputRow> = files
-        .par_iter()
-        .flat_map(|file| {
-            let delimiter = match file.extension().and_then(OsStr::to_str) {
-                Some("tsv") | Some("tab") => b'\t',
-                _ => b',',
-            };
+    let per_file: Vec<TableFile> = files.par_iter().map(|file| read_one_table(file)).collect();
 
-            let rdr = csv::ReaderBuilder::new()
-                .flexible(false)
-                .delimiter(delimiter)
-                .from_path(file);
+    let mut all_rows: Vec<TableInputRow> = Vec::new();
+    for f in per_file {
+        if let Some(err) = f.open_error {
+            return Err(format!("Cannot open table file {}: {}", f.path.display(), err));
+        }
+        if f.rows.is_empty() && f.error_count > 0 {
+            return Err(format!(
+                "Every data row in {} failed to parse ({} row(s)). First error: {}",
+                f.path.display(),
+                f.error_count,
+                f.first_error.unwrap_or_else(|| "unknown".to_string())
+            ));
+        }
+        if f.error_count > 0 {
+            eprintln!(
+                "Warning: skipped {} malformed row(s) in {}. First error: {}",
+                f.error_count,
+                f.path.display(),
+                f.first_error.unwrap_or_else(|| "unknown".to_string())
+            );
+        }
+        all_rows.extend(f.rows);
+    }
 
-            match rdr {
-                Ok(mut reader) => {
-                    let mut rows = Vec::new();
-                    for result in reader.deserialize() {
-                        match result {
-                            Ok(row) => rows.push(row),
-                            Err(_) => {
-                                error_count.fetch_add(1, Ordering::Relaxed);
-                            }
-                        }
-                    }
-                    rows
-                }
-                Err(e) => {
-                    eprintln!("Error: cannot open table file {}: {}", file.display(), e);
-                    Vec::new()
-                }
-            }
-        })
-        .collect();
-
-    let skipped = error_count.load(Ordering::Relaxed);
-    if skipped > 0 {
-        eprintln!(
-            "Warning: skipped {} malformed row(s) in table input.",
-            skipped
+    // A table with no chrom column and one with a real chrom column cannot be
+    // combined: the same physical site would land under two different keys.
+    let with_chrom = all_rows.iter().filter(|r| r.chrom.is_some()).count();
+    if with_chrom != 0 && with_chrom != all_rows.len() {
+        return Err(
+            "Some table rows carry a 'chrom' column and others do not. \
+             Add the column everywhere, or remove it everywhere."
+                .to_string(),
         );
     }
 
     let filtered_rows: Vec<TableInputRow> = all_rows.into_iter().filter(|row| {
         // Validate frequency range
         if !row.frequency.is_finite() || !(0.0..=1.0).contains(&row.frequency) {
+            out_of_range.fetch_add(1, Ordering::Relaxed);
             return false;
         }
         let depth_ok = row.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
@@ -69,12 +65,23 @@ pub fn read_csv_files(
         depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
     }).collect();
 
+    let n = out_of_range.load(Ordering::Relaxed);
+    if n > 0 {
+        eprintln!(
+            "Warning: dropped {} table row(s) whose frequency was outside [0,1] or not finite.",
+            n
+        );
+    }
+
     let mut variants_by_sample: SampleVariants = HashMap::new();
     let mut all_positions: HashSet<GenomicPos> = HashSet::new();
+    let mut duplicates = 0usize;
 
     for row in filtered_rows {
         let gpos = GenomicPos {
-            chrom: row.chrom,
+            // Rows either all carry a chrom or none do, so this placeholder is
+            // applied uniformly and cannot split a site in two.
+            chrom: row.chrom.filter(|c| !c.is_empty()).unwrap_or_else(|| ".".to_string()),
             pos: row.position,
         };
         all_positions.insert(gpos.clone());
@@ -82,11 +89,92 @@ pub fn read_csv_files(
         let site_data = sample_map.entry(gpos).or_default();
 
         if let Some(ref_a) = row.ref_allele {
-            site_data.reference_allele = ref_a;
+            if site_data.reference_allele.is_empty() {
+                site_data.reference_allele = ref_a;
+            }
         }
-        site_data.freqs.insert(row.sequence, row.frequency);
+        // First value wins, matching the VCF reader. Contradictory duplicates have no
+        // defensible answer, so the point is to say they were there.
+        if site_data.freqs.contains_key(&row.sequence) {
+            duplicates += 1;
+        }
+        site_data.freqs.entry(row.sequence).or_insert(row.frequency);
     }
+
+    if duplicates > 0 {
+        eprintln!(
+            "Warning: {} duplicate (sample, chrom, position, allele) row(s); first value kept.",
+            duplicates
+        );
+    }
+
     Ok((all_positions, variants_by_sample))
+}
+
+/// One table file's rows plus what went wrong reading it.
+struct TableFile {
+    path: PathBuf,
+    rows: Vec<TableInputRow>,
+    error_count: usize,
+    first_error: Option<String>,
+    open_error: Option<String>,
+}
+
+fn read_one_table(file: &PathBuf) -> TableFile {
+    let mut out = TableFile {
+        path: file.clone(),
+        rows: Vec::new(),
+        error_count: 0,
+        first_error: None,
+        open_error: None,
+    };
+
+    let delimiter = match file.extension().and_then(OsStr::to_str) {
+        Some("tsv") | Some("tab") => b'\t',
+        _ => b',',
+    };
+
+    let mut reader = match csv::ReaderBuilder::new()
+        .flexible(false)
+        .delimiter(delimiter)
+        .from_path(file)
+    {
+        Ok(r) => r,
+        Err(e) => {
+            out.open_error = Some(e.to_string());
+            return out;
+        }
+    };
+
+    // The README promises case-insensitive column names, and without this a header
+    // of "Sample,Position,..." makes every row fail to deserialise, which silently
+    // deletes the whole file's worth of samples.
+    match reader.headers() {
+        Ok(headers) => {
+            let lowered: csv::StringRecord = headers
+                .iter()
+                .map(|h| h.trim().to_ascii_lowercase())
+                .collect();
+            reader.set_headers(lowered);
+        }
+        Err(e) => {
+            out.open_error = Some(e.to_string());
+            return out;
+        }
+    }
+
+    for result in reader.deserialize() {
+        match result {
+            Ok(row) => out.rows.push(row),
+            Err(e) => {
+                out.error_count += 1;
+                if out.first_error.is_none() {
+                    out.first_error = Some(e.to_string());
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Quote a field if it contains the separator, a quote, or a newline.
