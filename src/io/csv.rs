@@ -13,7 +13,7 @@ pub fn read_csv_files(
 ) -> Result<(HashSet<GenomicPos>, SampleVariants), String> {
     let out_of_range = AtomicUsize::new(0);
 
-    let per_file: Vec<TableFile> = files.par_iter().map(|file| read_one_table(file)).collect();
+    let per_file: Vec<TableFile> = files.par_iter().map(read_one_table).collect();
 
     let mut all_rows: Vec<TableInputRow> = Vec::new();
     for f in per_file {

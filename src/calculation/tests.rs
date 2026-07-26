@@ -436,8 +436,8 @@ mod tests {
         assert_eq!(m[2][0], 0.3);
         assert_eq!(m[1][2], 0.7);
         assert_eq!(m[2][1], 0.7);
-        for i in 0..3 {
-            assert_eq!(m[i][i], 0.0, "diagonal at {}", i);
+        for (i, row) in m.iter().enumerate() {
+            assert_eq!(row[i], 0.0, "diagonal at {}", i);
         }
     }
 
