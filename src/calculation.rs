@@ -1,4 +1,7 @@
+pub mod common;
 pub mod fst;
+#[cfg(test)]
+mod tests;
 pub mod gst;
 pub mod nei;
 pub mod chord;
@@ -8,9 +11,13 @@ pub mod reynolds;
 pub mod rogers;
 
 pub fn generate_sample_pairs(samples: &[String]) -> Vec<(usize, usize)> {
-    let mut pairs = Vec::new();
-    for i in 0..samples.len() {
-        for j in (i + 1)..samples.len() {
+    let n = samples.len();
+    if n < 2 {
+        return Vec::new();
+    }
+    let mut pairs = Vec::with_capacity(n * (n - 1) / 2);
+    for i in 0..n {
+        for j in (i + 1)..n {
             pairs.push((i, j));
         }
     }

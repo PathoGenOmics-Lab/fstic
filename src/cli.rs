@@ -1,149 +1,131 @@
-use clap::{App, Arg, ArgMatches};
+use clap::Parser;
 use rayon::ThreadPoolBuilder;
 use std::path::PathBuf;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum Formula {
+    Fst,
+    Gst,
+    Nei,
+    Chord,
+    #[value(name = "bray-curtis")]
+    BrayCurtis,
+    #[value(name = "jost_d")]
+    JostD,
+    Reynolds,
+    Rogers,
+}
 
 pub enum InputMode {
     Vcf,
     Table,
 }
 
-/// Builds the command-line interface using clap.
-pub fn build_cli() -> App<'static, 'static> {
-    App::new("fstic")
-        .version("1.0.0")
-        .about("Calculates pairwise genetic distances between samples using standard estimators.")
-        .author("Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>")
-        .arg(
-            Arg::with_name("vcf")
-                .long("vcf")
-                .value_name("VCF_FILES")
-                .help("One or more input VCF files.")
-                .multiple(true)
-                .required_unless_one(&["vcf_list", "table", "table_list"]),
-        )
-        .arg(
-            Arg::with_name("vcf_list")
-                .long("vcf-list")
-                .value_name("VCF_LIST")
-                .help("A file containing a list of input VCF files.")
-                .required_unless_one(&["vcf", "table", "table_list"]),
-        )
-        .arg(
-            Arg::with_name("table")
-                .long("table")
-                .value_name("TABLE_FILES")
-                .help("One or more input table files (format detected by extension: .csv, .tsv, .tab).")
-                .multiple(true)
-                .required_unless_one(&["vcf", "vcf_list", "table_list"]),
-        )
-        .arg(
-            Arg::with_name("table_list")
-                .long("table-list")
-                .value_name("TABLE_LIST")
-                .help("A file containing a list of input table files.")
-                .required_unless_one(&["vcf", "vcf_list", "table"]),
-        )
-        .arg(
-            Arg::with_name("reference")
-                .short("r")
-                .long("reference")
-                .value_name("FASTA_FILE")
-                .help("Reference FASTA file (required for all inputs).")
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("output")
-                .short("o")
-                .long("output")
-                .value_name("OUTPUT_FILE")
-                .help("Output file name for the distance matrix.")
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("formula")
-                .short("f")
-                .long("formula")
-                .value_name("FORMULA")
-                .help("The distance formula to use.")
-                .possible_values(&["fst", "gst", "nei", "chord", "bray-curtis", "jost_d", "reynolds", "rogers"])
-                .default_value("fst"),
-        )
-        .arg(
-            Arg::with_name("normalize")
-                .long("normalize")
-                .help("Normalize by the number of loci (affects: fst, chord, bray-curtis, jost_d).")
-                .takes_value(false),
-        )
-        .arg(
-            Arg::with_name("min_depth")
-                .long("min-depth")
-                .value_name("DP")
-                .help("Minimum total read depth to keep a variant.")
-                .default_value("30"),
-        )
-        .arg(
-            Arg::with_name("min_af")
-                .long("min-af")
-                .value_name("FREQ")
-                .help("Minimum alternate allele frequency to keep a variant.")
-                .default_value("0.05"),
-        )
-        .arg(
-            Arg::with_name("min_alt_reads")
-                .long("min-alt-reads")
-                .value_name("AD")
-                .help("Minimum number of alternate allele reads to keep a variant.")
-                .default_value("2"),
-        )
-        .arg(
-            Arg::with_name("min_alt_rev_reads")
-                .long("min-alt-rev-reads")
-                .value_name("ADR")
-                .help("Minimum number of alternate allele reverse reads to keep a variant.")
-                .default_value("2"),
-        )
-        .arg(
-            Arg::with_name("workers")
-                .short("w")
-                .long("workers")
-                .value_name("NUM_WORKERS")
-                .help("Number of worker threads (default: all available cores)."),
-        )
+/// High-performance pairwise genetic distance calculator from allele-frequency data.
+#[derive(Parser, Debug)]
+#[command(name = "fstic", version, about, author = "Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>")]
+pub struct Args {
+    /// One or more input VCF files.
+    #[arg(long = "vcf", num_args = 1.., value_name = "VCF_FILES", group = "input")]
+    pub vcf: Option<Vec<PathBuf>>,
+
+    /// A file containing a list of input VCF paths.
+    #[arg(long = "vcf-list", value_name = "VCF_LIST", group = "input")]
+    pub vcf_list: Option<PathBuf>,
+
+    /// One or more input table files (.csv, .tsv, .tab).
+    #[arg(long = "table", num_args = 1.., value_name = "TABLE_FILES", group = "input")]
+    pub table: Option<Vec<PathBuf>>,
+
+    /// A file containing a list of input table paths.
+    #[arg(long = "table-list", value_name = "TABLE_LIST", group = "input")]
+    pub table_list: Option<PathBuf>,
+
+    /// Reference FASTA file (required for table inputs; optional for VCF).
+    #[arg(short = 'r', long = "reference", value_name = "FASTA_FILE")]
+    pub reference: Option<PathBuf>,
+
+    /// Output file name for the distance matrix.
+    #[arg(short = 'o', long = "output", value_name = "OUTPUT_FILE")]
+    pub output: PathBuf,
+
+    /// Distance formula to use.
+    #[arg(short = 'f', long = "formula", default_value = "fst")]
+    pub formula: Formula,
+
+    /// Normalize by the number of loci (affects: fst, chord, bray-curtis, jost_d).
+    #[arg(long = "normalize")]
+    pub normalize: bool,
+
+    /// Minimum total read depth to keep a variant.
+    #[arg(long = "min-depth", default_value_t = 30)]
+    pub min_depth: u32,
+
+    /// Minimum alternate allele frequency to keep a variant.
+    #[arg(long = "min-af", default_value_t = 0.05)]
+    pub min_af: f64,
+
+    /// Minimum number of alternate allele reads to keep a variant.
+    #[arg(long = "min-alt-reads", default_value_t = 2)]
+    pub min_alt_reads: u32,
+
+    /// Minimum number of alternate allele reverse reads to keep a variant.
+    #[arg(long = "min-alt-rev-reads", default_value_t = 2)]
+    pub min_alt_rev_reads: u32,
+
+    /// Only keep variants that PASS all filters (VCF FILTER column).
+    #[arg(long = "pass-only")]
+    pub pass_only: bool,
+
+    /// Number of worker threads (default: all available cores).
+    #[arg(short = 'w', long = "workers")]
+    pub workers: Option<usize>,
 }
 
-pub fn get_input_files(matches: &ArgMatches) -> Result<(InputMode, Vec<PathBuf>), String> {
-    if matches.is_present("vcf") || matches.is_present("vcf_list") {
-        let files = get_files_from_args(matches, "vcf", "vcf_list")?;
-        Ok((InputMode::Vcf, files))
-    } else if matches.is_present("table") || matches.is_present("table_list") {
-        let files = get_files_from_args(matches, "table", "table_list")?;
-        Ok((InputMode::Table, files))
-    } else {
-        Err("No input files provided. Use --vcf, --vcf-list, --table, or --table-list.".to_string())
+impl Args {
+    /// Resolve input mode and file list.
+    pub fn get_input_files(&self) -> Result<(InputMode, Vec<PathBuf>), String> {
+        if self.vcf.is_some() || self.vcf_list.is_some() {
+            let files = self.resolve_files(&self.vcf, &self.vcf_list)?;
+            Ok((InputMode::Vcf, files))
+        } else if self.table.is_some() || self.table_list.is_some() {
+            if self.reference.is_none() {
+                return Err(
+                    "Error: --reference is required when using table input (needed to infer reference alleles).".to_string(),
+                );
+            }
+            let files = self.resolve_files(&self.table, &self.table_list)?;
+            Ok((InputMode::Table, files))
+        } else {
+            Err("No input files provided. Use --vcf, --vcf-list, --table, or --table-list.".to_string())
+        }
     }
-}
 
-fn get_files_from_args(matches: &ArgMatches, arg_direct: &str, arg_list: &str) -> Result<Vec<PathBuf>, String> {
-    if let Some(list_file) = matches.value_of(arg_list) {
-        super::io::read_file_list(list_file)
-            .map_err(|e| format!("Error reading list file {}: {}", list_file, e))
-    } else {
-        Ok(matches
-            .values_of(arg_direct)
-            .unwrap()
-            .map(PathBuf::from)
-            .collect())
+    fn resolve_files(
+        &self,
+        direct: &Option<Vec<PathBuf>>,
+        list: &Option<PathBuf>,
+    ) -> Result<Vec<PathBuf>, String> {
+        if let Some(list_path) = list {
+            crate::io::read_file_list(
+                list_path
+                    .to_str()
+                    .ok_or_else(|| "Invalid list file path".to_string())?,
+            )
+            .map_err(|e| format!("Error reading list file: {}", e))
+        } else if let Some(files) = direct {
+            Ok(files.clone())
+        } else {
+            Err("No input files provided.".to_string())
+        }
     }
-}
 
-pub fn configure_thread_pool(matches: &ArgMatches) {
-    let num_workers = matches
-        .value_of("workers")
-        .and_then(|w| w.parse::<usize>().ok())
-        .unwrap_or_else(num_cpus::get);
-
-    ThreadPoolBuilder::new()
-        .num_threads(num_workers)
-        .build_global()
-        .unwrap();
+    /// Configure the global rayon thread pool.
+    pub fn configure_thread_pool(&self) {
+        let num_workers = self.workers.unwrap_or_else(num_cpus::get);
+        // Silently ignore if already initialized (e.g., in tests)
+        let _ = ThreadPoolBuilder::new()
+            .num_threads(num_workers)
+            .build_global();
+    }
 }

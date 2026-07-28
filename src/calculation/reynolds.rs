@@ -1,21 +1,43 @@
-use crate::types::PositionalData;
-use std::collections::HashSet;
+use super::common::{get_all_freqs_at_pos, sum_per_locus_n};
+use crate::types::{GenomicPos, PositionalData};
 
-/// Calculates Reynolds' distance (1983), which is a transformation of GST.
-/// D = -ln(1 - GST). This distance is theoretically linear with time.
-/// It is a global metric and not affected by the --normalize flag.
+/// Calculates Reynolds, Weir & Cockerham's (1983) distance: `D_R = -ln(1 - theta)`.
+///
+/// The coancestry coefficient is the ratio of sums
+/// `theta = sum_l [ sum_i (p_i - q_i)^2 / 2 ] / sum_l [ 1 - sum_i p_i q_i ]`,
+/// which is not Nei's GST: the two disagree at any locus that is not completely
+/// fixed. Substituting GST gave numbers that could not be compared with adegenet,
+/// Arlequin or GenAlEx output carrying the same name.
+///
+/// Not affected by `--normalize`.
 pub fn calculate_reynolds_distance_for_pair(
     data1: &PositionalData,
     data2: &PositionalData,
-    all_positions: &HashSet<usize>,
+    all_positions: &[GenomicPos],
 ) -> f64 {
-    // This distance is a direct function of the global GST.
-    // To avoid code duplication, we call the GST calculation function directly.
-    let gst = super::gst::calculate_gst_for_pair(data1, data2, all_positions);
+    let [total_num, total_den] = sum_per_locus_n(all_positions, |pos| {
+        let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
+        let mut sum_sq = 0.0_f64;
+        let mut sum_prod = 0.0_f64;
+        for allele in &psf.all_alleles {
+            let p = psf.freqs1.get(allele).copied().unwrap_or(0.0);
+            let q = psf.freqs2.get(allele).copied().unwrap_or(0.0);
+            sum_sq += (p - q).powi(2);
+            sum_prod += p * q;
+        }
+        [sum_sq / 2.0, 1.0 - sum_prod]
+    });
 
-    if (1.0 - gst) > 0.0 {
-        -(1.0 - gst).ln()
+    // A zero denominator means every locus is monomorphic and shared, i.e. the two
+    // samples are identical.
+    if total_den <= 0.0 {
+        return 0.0;
+    }
+
+    let theta = total_num / total_den;
+    if theta < 1.0 {
+        -(1.0 - theta).ln()
     } else {
-        f64::INFINITY // Distance is infinite if populations are completely differentiated (GST=1)
+        f64::INFINITY
     }
 }

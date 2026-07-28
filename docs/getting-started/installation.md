@@ -1,0 +1,58 @@
+# Installation
+
+## Bioconda
+
+The released binary is on Bioconda and is the quickest way in.
+
+=== "conda"
+
+    ```bash
+    conda install -c bioconda fstic
+    ```
+
+=== "mamba"
+
+    ```bash
+    mamba install -c bioconda fstic
+    ```
+
+Check it landed:
+
+```bash
+fstic --version
+```
+
+## From source
+
+Fstic is a single Rust binary with no system dependencies beyond a toolchain.
+
+```bash
+git clone https://github.com/PathoGenOmics-Lab/fstic.git
+cd fstic
+cargo build --release
+```
+
+The binary is at `target/release/fstic`. Put it somewhere on your `PATH`:
+
+```bash
+install -m 755 target/release/fstic ~/.local/bin/
+```
+
+!!! note "Rust version"
+
+    The crate uses the 2021 edition and `Option::is_none_or`, so it needs Rust
+    1.82 or newer. `rustup update stable` if `cargo build` complains about an
+    unstable method.
+
+## Running the test suite
+
+Worth doing once after building from source, particularly on an unusual
+platform, since a few of the tests pin exact numeric output.
+
+```bash
+cargo test
+```
+
+That covers the eight estimators against hand-computed values, the VCF and
+table readers, the FASTA reader, output formatting, and a check that results do
+not change with the thread count.
