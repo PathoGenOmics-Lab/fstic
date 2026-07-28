@@ -1,0 +1,1826 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Pairwise genetic distance matrices from allele-frequency data. Fstic reads single-sample VCFs or frequency tables and computes eight standard estimators (FST, GST, Jost's D, Reynolds, Nei, chord, Rogers, Bray-Curtis) in parallel.">
+      
+      
+        <meta name="author" content="PathoGenOmics Lab">
+      
+      
+        <link rel="canonical" href="https://pathogenomics-lab.github.io/fstic/tutorial/">
+      
+      
+        <link rel="prev" href="../getting-started/inputs/">
+      
+      
+        <link rel="next" href="../guide/metrics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/fstic_logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Tutorial - Fstic</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+  
+  
+    
+      
+      
+    
+  
+  
+  <style>:root{--md-admonition-icon--note:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M4%202h2v2c0%201.44.68%202.61%201.88%203.78.86.83%202.01%201.63%203.21%202.42l-1.83%201.19C8.27%2010.72%207.31%2010%206.5%209.21%205.07%207.82%204%206.1%204%204zm14%200h2v2c0%202.1-1.07%203.82-2.5%205.21-1.41%201.38-3.21%202.52-4.96%203.63-1.75%201.12-3.45%202.21-4.66%203.38C6.68%2017.39%206%2018.56%206%2020v2H4v-2c0-2.1%201.07-3.82%202.5-5.21%201.41-1.38%203.21-2.52%204.96-3.63%201.75-1.12%203.45-2.21%204.66-3.38C17.32%206.61%2018%205.44%2018%204zm-3.26%2010.61c.99.67%201.95%201.39%202.76%202.18C18.93%2016.18%2020%2017.9%2020%2020v2h-2v-2c0-1.44-.68-2.61-1.88-3.78-.86-.83-2.01-1.63-3.21-2.42zM7%203h10v1l-.06.5H7.06L7%204zm.68%203h8.64c-.24.34-.52.69-.9%201.06l-.51.44H9.07l-.49-.44c-.38-.37-.66-.72-.9-1.06m1.41%2010.5h5.84l.49.44c.38.37.66.72.9%201.06H7.68c.24-.34.52-.69.9-1.06zm-2.03%203h9.88l.06.5v1H7v-1z%22/%3E%3C/svg%3E');}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tutorial" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Fstic" class="md-header__button md-logo" aria-label="Fstic" data-md-component="logo">
+      
+  <img src="../assets/fstic_logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Fstic
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tutorial
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PathoGenOmics-Lab/fstic" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PathoGenOmics-Lab/fstic
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tutorial
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guide/metrics/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../how-it-works/model/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How it works
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../about/changelog/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  About
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Fstic" class="md-nav__button md-logo" aria-label="Fstic" data-md-component="logo">
+      
+  <img src="../assets/fstic_logo.svg" alt="logo">
+
+    </a>
+    Fstic
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PathoGenOmics-Lab/fstic" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PathoGenOmics-Lab/fstic
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/inputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-build-the-example-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Build the example data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. First run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-normalise-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Normalise it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-filters-and-what-they-cost-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Filters, and what they cost you
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-compare-estimators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Compare estimators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-build-a-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Build a tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-reading-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Reading the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing an estimator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filtering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command-line reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How it works
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/reliability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility and failure modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-build-the-example-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Build the example data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. First run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-normalise-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Normalise it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-filters-and-what-they-cost-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Filters, and what they cost you
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-compare-estimators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Compare estimators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-build-a-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Build a tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-reading-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Reading the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tutorial">Tutorial<a class="headerlink" href="#tutorial" title="Permanent link">&para;</a></h1>
+<p>A complete run on four samples, from raw VCFs to a tree, with every number on
+this page produced by the commands shown. It takes about ten minutes.</p>
+<p>The scenario is a small suspected transmission cluster: four <em>M. tuberculosis</em>
+samples, one of which turns out to be a mixed infection. By the end you will
+have found it in the distance matrix.</p>
+<h2 id="1-build-the-example-data">1. Build the example data<a class="headerlink" href="#1-build-the-example-data" title="Permanent link">&para;</a></h2>
+<p>Save this as <code>make_example.py</code> and run it. It writes four single-sample VCFs in
+the current directory, so no download is needed.</p>
+<div class="language-python highlight"><span class="filename">make_example.py</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="ch">#!/usr/bin/env python3</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="sd">&quot;&quot;&quot;Write four single-sample VCFs for the Fstic tutorial.&quot;&quot;&quot;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">HEADER</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;##fileformat=VCFv4.2</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">&quot;##contig=&lt;ID=Chromosome,length=4411532&gt;</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">&quot;#CHROM</span><span class="se">\t</span><span class="s2">POS</span><span class="se">\t</span><span class="s2">ID</span><span class="se">\t</span><span class="s2">REF</span><span class="se">\t</span><span class="s2">ALT</span><span class="se">\t</span><span class="s2">QUAL</span><span class="se">\t</span><span class="s2">FILTER</span><span class="se">\t</span><span class="s2">INFO</span><span class="se">\t</span><span class="s2">FORMAT</span><span class="se">\t</span><span class="s2">sample</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">ALLELES</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="mi">1000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;G&quot;</span><span class="p">),</span> <span class="mi">2000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;T&quot;</span><span class="p">),</span>  <span class="mi">3000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;G&quot;</span><span class="p">,</span> <span class="s2">&quot;A&quot;</span><span class="p">),</span> <span class="mi">4000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">),</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="mi">5000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">),</span> <span class="mi">7000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="s2">&quot;T&quot;</span><span class="p">),</span>  <span class="mi">8000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;G&quot;</span><span class="p">),</span> <span class="mi">9000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;G&quot;</span><span class="p">,</span> <span class="s2">&quot;T&quot;</span><span class="p">),</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="mi">10000</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="s2">&quot;A&quot;</span><span class="p">),</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">}</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">SAMPLES</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="c1"># Lineage A</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="s2">&quot;TB-001&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">1000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">2000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span>  <span class="mi">98</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>               <span class="mi">3000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">110</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">)},</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="s2">&quot;TB-002&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">1000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">105</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">2000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">115</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>               <span class="mi">3000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span>  <span class="mi">90</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">4000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">102</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">)},</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="c1"># Lineage B</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="s2">&quot;TB-003&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">7000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span>  <span class="mi">88</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">8000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span>  <span class="mi">95</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>               <span class="mi">9000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">101</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">10000</span><span class="p">:</span> <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="mi">99</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">)},</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="c1"># Mostly lineage A with a minority of lineage B, plus one noisy call</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="s2">&quot;TB-004&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">1000</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.68</span><span class="p">,</span> <span class="mi">130</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">2000</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.71</span><span class="p">,</span> <span class="mi">125</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>               <span class="mi">3000</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.66</span><span class="p">,</span> <span class="mi">118</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">7000</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.32</span><span class="p">,</span> <span class="mi">130</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>               <span class="mi">8000</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.29</span><span class="p">,</span> <span class="mi">124</span><span class="p">,</span> <span class="s2">&quot;PASS&quot;</span><span class="p">),</span> <span class="mi">5000</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.04</span><span class="p">,</span>  <span class="mi">80</span><span class="p">,</span> <span class="s2">&quot;LowQual&quot;</span><span class="p">)},</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="p">}</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">calls</span> <span class="ow">in</span> <span class="n">SAMPLES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.vcf&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>        <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">HEADER</span><span class="p">)</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>        <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">calls</span><span class="p">):</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>            <span class="n">freq</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">filt</span> <span class="o">=</span> <span class="n">calls</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>            <span class="n">ref</span><span class="p">,</span> <span class="n">alt</span> <span class="o">=</span> <span class="n">ALLELES</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>            <span class="n">ad</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">dp</span> <span class="o">*</span> <span class="n">freq</span><span class="p">)</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>            <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>                <span class="sa">f</span><span class="s2">&quot;Chromosome</span><span class="se">\t</span><span class="si">{</span><span class="n">pos</span><span class="si">}</span><span class="se">\t</span><span class="s2">.</span><span class="se">\t</span><span class="si">{</span><span class="n">ref</span><span class="si">}</span><span class="se">\t</span><span class="si">{</span><span class="n">alt</span><span class="si">}</span><span class="se">\t</span><span class="s2">.</span><span class="se">\t</span><span class="si">{</span><span class="n">filt</span><span class="si">}</span><span class="se">\t</span><span class="s2">.</span><span class="se">\t</span><span class="s2">&quot;</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>                <span class="sa">f</span><span class="s2">&quot;GT:DP:AD:ADR:FREQ</span><span class="se">\t</span><span class="s2">1:</span><span class="si">{</span><span class="n">dp</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">ad</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">ad</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">freq</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>            <span class="p">)</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;wrote </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.vcf (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">calls</span><span class="p">)</span><span class="si">}</span><span class="s2"> variants)&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>make_example.py
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>wrote TB-001.vcf (3 variants)
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>wrote TB-002.vcf (4 variants)
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>wrote TB-003.vcf (4 variants)
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>wrote TB-004.vcf (6 variants)
+</span></code></pre></div>
+<p><code>TB-004.vcf</code> is the interesting one:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>#CHROM      POS   ID REF ALT QUAL FILTER  INFO FORMAT            sample
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Chromosome  1000  .  A   G   .    PASS    .    GT:DP:AD:ADR:FREQ 1:130:88:44:68.0%
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>Chromosome  2000  .  C   T   .    PASS    .    GT:DP:AD:ADR:FREQ 1:125:89:44:71.0%
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>Chromosome  3000  .  G   A   .    PASS    .    GT:DP:AD:ADR:FREQ 1:118:78:39:66.0%
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>Chromosome  5000  .  A   C   .    LowQual .    GT:DP:AD:ADR:FREQ 1:80:3:1:4.0%
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>Chromosome  7000  .  A   T   .    PASS    .    GT:DP:AD:ADR:FREQ 1:130:42:21:32.0%
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>Chromosome  8000  .  C   G   .    PASS    .    GT:DP:AD:ADR:FREQ 1:124:36:18:29.0%
+</span></code></pre></div>
+<p>Nothing is at 100%. It carries the lineage A variants at about 68% and the
+lineage B variants at about 30%, which is what a mixed infection looks like in
+frequency space. The call at 5000 is deliberate noise: 4% frequency, three
+supporting reads, one on the reverse strand, and <code>LowQual</code> in <code>FILTER</code>.</p>
+<h2 id="2-first-run">2. First run<a class="headerlink" href="#2-first-run" title="Permanent link">&para;</a></h2>
+<p>Sample names come from the file names, so no other setup is needed.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>--output<span class="w"> </span>distances.csv
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>--- Applying Filters ---
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>&gt; Minimum Depth (DP): 30
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>&gt; Minimum Allele Freq (AF): 0.05
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>&gt; Minimum Alternate Reads (AD): 2
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>&gt; Minimum Alt. Reverse Reads (ADR): 2
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>------------------------
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>Reading 4 input files...
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>Found 4 samples and 8 polymorphic sites after filtering.
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>Computing Fst distances for 6 pairs...
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>--- Summary ---
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>&gt; Samples: 4
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>&gt; Loci: 8
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>&gt; Pairs: 6
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>&gt; Formula: Fst
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>&gt; Output: distances.csv
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>&gt; Time: 0.00s
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>---------------
+</span></code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Read the summary first</p>
+<p>Nine positions were written across the four files but only <strong>8 loci</strong>
+survived. The noisy call at 5000 was dropped, in this case by two filters at
+once: 4% is below <code>--min-af 0.05</code>, and one reverse read is below
+<code>--min-alt-rev-reads 2</code>. Getting into the habit of checking that number
+against what you expect will catch most configuration mistakes.</p>
+</div>
+<p>The matrix:</p>
+<table class="matrix">
+<thead><tr><th>sample</th><th>TB-001</th><th>TB-002</th><th>TB-003</th><th>TB-004</th></tr></thead>
+<tbody>
+<tr><td>TB-001</td><td>0.0000000000</td><td>1.0000000000</td><td>7.0000000000</td><td>0.9249529446</td></tr>
+<tr><td>TB-002</td><td>1.0000000000</td><td>0.0000000000</td><td>8.0000000000</td><td>1.9249529446</td></tr>
+<tr><td>TB-003</td><td>7.0000000000</td><td>8.0000000000</td><td>0.0000000000</td><td>4.6236155375</td></tr>
+<tr><td>TB-004</td><td>0.9249529446</td><td>1.9249529446</td><td>4.6236155375</td><td>0.0000000000</td></tr>
+</tbody>
+</table>
+
+<p>A distance of 7.0 will look wrong if you were expecting an FST. It is not.</p>
+<div class="admonition warning">
+<p class="admonition-title">The default <code>fst</code> is cumulative</p>
+<p><code>--formula fst</code> sums the per-locus Nei <span class="arithmatex">\(G_{ST}\)</span> across sites, so it grows
+with the number of loci: 7.0 here means seven loci behaving as complete
+differences. Over a real genome it reaches the thousands.</p>
+<p>For a per-locus mean, add <code>--normalize</code>. For a number that is bounded
+without any flag, use <code>--formula gst</code>.</p>
+</div>
+<h2 id="3-normalise-it">3. Normalise it<a class="headerlink" href="#3-normalise-it" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>--output<span class="w"> </span>fst_norm.csv<span class="w"> </span>--normalize
+</span></code></pre></div>
+<table class="matrix">
+<thead><tr><th>sample</th><th>TB-001</th><th>TB-002</th><th>TB-003</th><th>TB-004</th></tr></thead>
+<tbody>
+<tr><td>TB-001</td><td>0.0000000000</td><td>0.1250000000</td><td>0.8750000000</td><td>0.1156191181</td></tr>
+<tr><td>TB-002</td><td>0.1250000000</td><td>0.0000000000</td><td>1.0000000000</td><td>0.2406191181</td></tr>
+<tr><td>TB-003</td><td>0.8750000000</td><td>1.0000000000</td><td>0.0000000000</td><td>0.5779519422</td></tr>
+<tr><td>TB-004</td><td>0.1156191181</td><td>0.2406191181</td><td>0.5779519422</td><td>0.0000000000</td></tr>
+</tbody>
+</table>
+
+<p>Now it reads: TB-001 and TB-002 differ at one locus in eight (0.125), TB-002 and
+TB-003 differ at all eight (1.0), and TB-004 sits between the two groups.</p>
+<h2 id="4-filters-and-what-they-cost-you">4. Filters, and what they cost you<a class="headerlink" href="#4-filters-and-what-they-cost-you" title="Permanent link">&para;</a></h2>
+<p>Loosen the frequency threshold so the noisy call at 5000 could get through:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>-o<span class="w"> </span>loose.csv<span class="w"> </span>--min-af<span class="w"> </span><span class="m">0</span>.01
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Found 4 samples and 8 polymorphic sites after filtering.
+</span></code></pre></div>
+<p>Still 8. Frequency was not the only thing stopping it: the call has one reverse
+read against a default of two. Drop that too:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>-o<span class="w"> </span>loose.csv<span class="w"> </span>--min-af<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span>--min-alt-rev-reads<span class="w"> </span><span class="m">1</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Found 4 samples and 9 polymorphic sites after filtering.
+</span></code></pre></div>
+<p>Nine. The noise is now in the analysis. The <code>FILTER</code> column already said not to
+trust it, so let Fstic use that:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>-o<span class="w"> </span>pass.csv<span class="w"> </span>--min-af<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span>--min-alt-rev-reads<span class="w"> </span><span class="m">1</span><span class="w"> </span>--pass-only
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Found 4 samples and 8 polymorphic sites after filtering.
+</span></code></pre></div>
+<p>Back to 8.</p>
+<div class="admonition note">
+<p class="admonition-title">Thresholds work together</p>
+<p>A low <code>--min-af</code> is only safe with depth and strand support behind it. Here
+the frequency filter and the strand filter each caught the same bad call
+independently, which is the point of having both.</p>
+</div>
+<h2 id="5-compare-estimators">5. Compare estimators<a class="headerlink" href="#5-compare-estimators" title="Permanent link">&para;</a></h2>
+<p>They are cheap to run, and disagreement between them is informative.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">gst</label><label for="__tabbed_1_2">rogers</label><label for="__tabbed_1_3">jost_d</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>-o<span class="w"> </span>gst.csv<span class="w"> </span>--formula<span class="w"> </span>gst
+</span></code></pre></div>
+<p><table class="matrix">
+<thead><tr><th>sample</th><th>TB-001</th><th>TB-002</th><th>TB-003</th><th>TB-004</th></tr></thead>
+<tbody>
+<tr><td>TB-001</td><td>0.0000000000</td><td>1.0000000000</td><td>1.0000000000</td><td>0.1856806263</td></tr>
+<tr><td>TB-002</td><td>1.0000000000</td><td>0.0000000000</td><td>1.0000000000</td><td>0.4099245470</td></tr>
+<tr><td>TB-003</td><td>1.0000000000</td><td>1.0000000000</td><td>0.0000000000</td><td>0.6709156249</td></tr>
+<tr><td>TB-004</td><td>0.1856806263</td><td>0.4099245470</td><td>0.6709156249</td><td>0.0000000000</td></tr>
+</tbody>
+</table></p>
+</div>
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>-o<span class="w"> </span>rogers.csv<span class="w"> </span>--formula<span class="w"> </span>rogers
+</span></code></pre></div>
+<p><table class="matrix">
+<thead><tr><th>sample</th><th>TB-001</th><th>TB-002</th><th>TB-003</th><th>TB-004</th></tr></thead>
+<tbody>
+<tr><td>TB-001</td><td>0.0000000000</td><td>0.3535533906</td><td>0.9354143467</td><td>0.2471335671</td></tr>
+<tr><td>TB-002</td><td>0.3535533906</td><td>0.0000000000</td><td>1.0000000000</td><td>0.4313641153</td></tr>
+<tr><td>TB-003</td><td>0.9354143467</td><td>1.0000000000</td><td>0.0000000000</td><td>0.7389688762</td></tr>
+<tr><td>TB-004</td><td>0.2471335671</td><td>0.4313641153</td><td>0.7389688762</td><td>0.0000000000</td></tr>
+</tbody>
+</table></p>
+</div>
+<div class="tabbed-block">
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>-o<span class="w"> </span>jost.csv<span class="w"> </span>--formula<span class="w"> </span>jost_d<span class="w"> </span>--normalize
+</span></code></pre></div>
+<p><table class="matrix">
+<thead><tr><th>sample</th><th>TB-001</th><th>TB-002</th><th>TB-003</th><th>TB-004</th></tr></thead>
+<tbody>
+<tr><td>TB-001</td><td>0.0000000000</td><td>0.1250000000</td><td>0.8750000000</td><td>0.0778270882</td></tr>
+<tr><td>TB-002</td><td>0.1250000000</td><td>0.0000000000</td><td>1.0000000000</td><td>0.2028270882</td></tr>
+<tr><td>TB-003</td><td>0.8750000000</td><td>1.0000000000</td><td>0.0000000000</td><td>0.6266558994</td></tr>
+<tr><td>TB-004</td><td>0.0778270882</td><td>0.2028270882</td><td>0.6266558994</td><td>0.0000000000</td></tr>
+</tbody>
+</table></p>
+</div>
+</div>
+</div>
+<p>Look at TB-001 against TB-002. Rogers says 0.354 and normalised FST says 0.125,
+both of which read as "these two are close". GST says <strong>1.000</strong>, the same as
+TB-001 against TB-003.</p>
+<p>That is not a bug, and it is worth understanding:</p>
+<div class="admonition info">
+<p class="admonition-title">GST is a ratio over informative loci</p>
+<p>GST divides the between-sample variance by the total, summed over loci.
+TB-001 and TB-002 are identical everywhere except position 4000, and at that
+one locus the difference is complete. Every locus that contributes anything
+to the denominator contributes all of it to the numerator, so the ratio
+saturates at 1.</p>
+<p>GST answers "of the variation that exists, how much separates them", not
+"how much variation is there". For closely related samples separated by a
+few fixed differences, that ratio saturates and you want <code>rogers</code> or
+<code>fst --normalize</code> instead.</p>
+</div>
+<h2 id="6-build-a-tree">6. Build a tree<a class="headerlink" href="#6-build-a-tree" title="Permanent link">&para;</a></h2>
+<p>Chord distance satisfies the triangle inequality, which makes it the reasonable
+choice to hand to a tree builder.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>fstic<span class="w"> </span>--vcf<span class="w"> </span>TB-*.vcf<span class="w"> </span>--output<span class="w"> </span>chord.csv<span class="w"> </span>--formula<span class="w"> </span>chord
+</span></code></pre></div>
+<table class="matrix">
+<thead><tr><th>sample</th><th>TB-001</th><th>TB-002</th><th>TB-003</th><th>TB-004</th></tr></thead>
+<tbody>
+<tr><td>TB-001</td><td>0.0000000000</td><td>1.4142135624</td><td>9.8994949366</td><td>2.9191129599</td></tr>
+<tr><td>TB-002</td><td>1.4142135624</td><td>0.0000000000</td><td>11.3137084990</td><td>4.3333265223</td></tr>
+<tr><td>TB-003</td><td>9.8994949366</td><td>11.3137084990</td><td>0.0000000000</td><td>7.5269878869</td></tr>
+<tr><td>TB-004</td><td>2.9191129599</td><td>4.3333265223</td><td>7.5269878869</td><td>0.0000000000</td></tr>
+</tbody>
+</table>
+
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Python</label><label for="__tabbed_2_2">R</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial.distance</span><span class="w"> </span><span class="kn">import</span> <span class="n">squareform</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.cluster.hierarchy</span><span class="w"> </span><span class="kn">import</span> <span class="n">linkage</span><span class="p">,</span> <span class="n">dendrogram</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">m</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;chord.csv&quot;</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">Z</span> <span class="o">=</span> <span class="n">linkage</span><span class="p">(</span><span class="n">squareform</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">checks</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;average&quot;</span><span class="p">)</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">dendrogram</span><span class="p">(</span><span class="n">Z</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">m</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">no_plot</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s2">&quot;ivl&quot;</span><span class="p">])</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>[&#39;TB-003&#39;, &#39;TB-004&#39;, &#39;TB-001&#39;, &#39;TB-002&#39;]
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-r highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">m</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">as.matrix</span><span class="p">(</span><span class="nf">read.csv</span><span class="p">(</span><span class="s">&quot;chord.csv&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">row.names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">check.names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">FALSE</span><span class="p">))</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="nf">plot</span><span class="p">(</span><span class="nf">hclust</span><span class="p">(</span><span class="nf">as.dist</span><span class="p">(</span><span class="n">m</span><span class="p">),</span><span class="w"> </span><span class="n">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;average&quot;</span><span class="p">))</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># or neighbour-joining</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="nf">library</span><span class="p">(</span><span class="n">ape</span><span class="p">)</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="nf">plot</span><span class="p">(</span><span class="nf">nj</span><span class="p">(</span><span class="nf">as.dist</span><span class="p">(</span><span class="n">m</span><span class="p">)))</span>
+</span></code></pre></div>
+</div>
+</div>
+</div>
+<p>The merge order tells the story:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Joined</th>
+<th>Height</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>TB-001 + TB-002</td>
+<td>1.414</td>
+</tr>
+<tr>
+<td>2</td>
+<td>TB-004 joins them</td>
+<td>3.626</td>
+</tr>
+<tr>
+<td>3</td>
+<td>TB-003 joins last</td>
+<td>9.580</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart LR
+    R(( )) --- L1["TB-003"]
+    R --- N1(( ))
+    N1 --- N2(( ))
+    N1 --- L4["TB-004"]
+    N2 --- L2["TB-001"]
+    N2 --- L3["TB-002"]</code></pre>
+<h2 id="7-reading-the-result">7. Reading the result<a class="headerlink" href="#7-reading-the-result" title="Permanent link">&para;</a></h2>
+<p>TB-001 and TB-002 form a tight pair, TB-003 sits well outside, and <strong>TB-004 is
+intermediate</strong>: 0.247 from TB-001 but 0.739 from TB-003 in Rogers distance.</p>
+<p>Intermediate is the signature worth noticing. A sample that is genuinely a
+recent descendant of lineage A would be <em>close</em> to TB-001 and TB-002 and <em>far</em>
+from TB-003, like they are. TB-004 is neither, because it is not one genotype.
+It contains both, at about 68% and 30%, and the distance lands in between in
+proportion.</p>
+<p>This is what allele frequencies buy you. A consensus caller would have written
+TB-004 as lineage A and thrown the 30% away, and the mixture would never have
+appeared in the matrix at all.</p>
+<div class="admonition tip">
+<p class="admonition-title">Confirming a mixture</p>
+<p>A distance matrix suggests a mixture; it does not prove one. Look at the
+frequency distribution of that sample's variants directly. A clean infection
+has variants near 0 or 1; a mixture shows a cluster around some intermediate
+value, here two clusters at roughly 0.68 and 0.30.</p>
+</div>
+<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
+<div class="grid cards">
+<ul>
+<li>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.42 5.29c-1.1-.1-2.07.71-2.17 1.82L10 10h2.82v2h-3l-.44 5.07A4.001 4.001 0 0 1 2 18.83l1.5-1.5c.33 1.05 1.46 1.64 2.5 1.3.78-.24 1.33-.93 1.4-1.74L7.82 12h-3v-2H8l.27-3.07a4.01 4.01 0 0 1 4.33-3.65c1.26.11 2.4.81 3.06 1.89l-1.5 1.5c-.25-.77-.93-1.31-1.74-1.38M22 13.65l-1.41-1.41-2.83 2.83-2.83-2.83-1.43 1.41 2.85 2.85-2.85 2.81 1.43 1.41 2.83-2.83 2.83 2.83L22 19.31l-2.83-2.81z"/></svg></span> <strong>Picking the right estimator</strong></p>
+<hr />
+<p>All eight formulas, their ranges, and what disagreement between them means.</p>
+<p><a href="../guide/metrics/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Choosing an estimator</a></p>
+</li>
+<li>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 13h12v-2H6M3 6v2h18V6M10 18h4v-2h-4z"/></svg></span> <strong>Filters on real data</strong></p>
+<hr />
+<p>Setting thresholds for consensus, within-host and deep amplicon work.</p>
+<p><a href="../guide/filtering/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Filtering</a></p>
+</li>
+<li>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 2h2v2c0 1.44.68 2.61 1.88 3.78.86.83 2.01 1.63 3.21 2.42l-1.83 1.19C8.27 10.72 7.31 10 6.5 9.21 5.07 7.82 4 6.1 4 4zm14 0h2v2c0 2.1-1.07 3.82-2.5 5.21-1.41 1.38-3.21 2.52-4.96 3.63-1.75 1.12-3.45 2.21-4.66 3.38C6.68 17.39 6 18.56 6 20v2H4v-2c0-2.1 1.07-3.82 2.5-5.21 1.41-1.38 3.21-2.52 4.96-3.63 1.75-1.12 3.45-2.21 4.66-3.38C17.32 6.61 18 5.44 18 4zm-3.26 10.61c.99.67 1.95 1.39 2.76 2.18C18.93 16.18 20 17.9 20 20v2h-2v-2c0-1.44-.68-2.61-1.88-3.78-.86-.83-2.01-1.63-3.21-2.42zM7 3h10v1l-.06.5H7.06L7 4zm.68 3h8.64c-.24.34-.52.69-.9 1.06l-.51.44H9.07l-.49-.44c-.38-.37-.66-.72-.9-1.06m1.41 10.5h5.84l.49.44c.38.37.66.72.9 1.06H7.68c.24-.34.52-.69.9-1.06zm-2.03 3h9.88l.06.5v1H7v-1z"/></svg></span> <strong>What a distance means here</strong></p>
+<hr />
+<p>Absent records, the locus set, and why cohort composition does not move a
+pairwise distance.</p>
+<p><a href="../how-it-works/model/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> The model</a></p>
+</li>
+<li>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2m0 4v4h6V8zm8 0v4h6V8zm-8 6v4h6v-4zm8 0v4h6v-4z"/></svg></span> <strong>Frequency tables</strong></p>
+<hr />
+<p>Skip VCFs entirely if your frequencies are already in a spreadsheet.</p>
+<p><a href="../getting-started/inputs/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Input formats</a></p>
+</li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../getting-started/inputs/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Input formats">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Input formats
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../guide/metrics/" class="md-footer__link md-footer__link--next" aria-label="Next: Choosing an estimator">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Choosing an estimator
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; PathoGenOmics Lab &middot; GPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/PathoGenOmics-Lab/fstic" target="_blank" rel="noopener" title="Fstic on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://anaconda.org/bioconda/fstic" target="_blank" rel="noopener" title="Fstic on Bioconda" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="m369.4 128-34.3-48H113l-34.3 48zM0 148.5c0-13.3 4.2-26.3 11.9-37.2l49-68.5C72.9 26 92.3 16 112.9 16H335c20.7 0 40.1 10 52.1 26.8l48.9 68.5c7.8 10.9 11.9 23.9 11.9 37.2L448 416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tracking", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
