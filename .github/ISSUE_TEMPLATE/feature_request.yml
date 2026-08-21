@@ -1,0 +1,41 @@
+name: Feature request
+description: Something Fstic should do and does not
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the analysis you are trying to do rather than the flag you
+        think you need. The flag is usually the easier half to get right once
+        the problem is clear.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The analysis, and where Fstic stops being able to help.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What do you do instead today?
+      description: >
+        Another tool, a preprocessing step, a script. Useful even when the
+        answer is "nothing, I gave up": it says how much the gap costs.
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would it look like?
+      description: A flag, an output column, a new estimator. A sketch is fine.
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference
+      description: >
+        For a new estimator, the paper defining it. Fstic implements published
+        estimators under their published names, so a citation is what makes one
+        implementable and checkable.

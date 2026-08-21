@@ -1,0 +1,120 @@
+name: CI
+
+# Quality gate for fstic. Runs once on a pull request, and again on main after
+# the merge.
+#
+# `push` is restricted to main rather than firing on every branch. With both
+# triggers open, a commit on a branch with a pull request open runs the whole
+# suite twice against the same commit: two notifications for one result. This
+# way each commit is checked exactly once, and main itself is still checked
+# after a merge.
+#
+# The cost is that a branch pushed without a pull request is not checked.
+# Nothing reaches main that way, since main takes pull requests and the checks
+# it requires are reported by the `pull_request` run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to a pull request makes the first run's answer irrelevant, so
+# stop it rather than pay for it. Runs on main are left alone: those record
+# whether a merged commit is sound, and a cancelled one records nothing.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Every job here reads the repository, builds it and runs tests. None writes a
+# comment, a label, a release or a commit. Without this block they would run
+# with whatever the repository default grants, which is more than that and
+# grows silently if the default is ever widened.
+permissions:
+  contents: read
+
+# Each job carries a `timeout-minutes`, because the default is six hours. What
+# matters is not how long a job takes but how long a stuck one takes to say so.
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Build · test · clippy · fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --check
+      - name: Clippy (deny warnings)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Build
+        run: cargo build --locked
+      - name: Test
+        run: cargo test --locked
+      # Packaging breaks in ways nothing else here notices: a file the build
+      # needs left out of `include`, metadata crates.io refuses, a size over the
+      # limit. Every one of those fails at release time, after the tag is
+      # pushed, which is the expensive moment to find out.
+      - name: The crate still packages and builds from its own tarball
+        run: cargo publish --dry-run --locked
+
+  msrv:
+    name: Builds on the minimum supported Rust version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # The version is an input, deliberately, and not `rust-toolchain@1.85`.
+      # Written as an action ref, Dependabot reads it as a version to keep
+      # current and bumps it, and this job then goes on passing while verifying
+      # a compiler that is no longer the floor. As an input it is invisible to
+      # Dependabot and changes only when someone changes it.
+      #
+      # Keep it equal to `rust-version` in Cargo.toml. cargo enforces that field
+      # against the toolchain, so a mismatch fails here rather than drifting.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and test on the floor
+        run: cargo test --locked
+
+  # The estimators are the reason anyone runs this, and two of their properties
+  # are not visible in a single run: that a pairwise distance does not depend on
+  # which other samples are in the cohort, and that the answer does not depend
+  # on the thread count. Both are covered by the integration suite above, but
+  # only at the sizes a unit test can afford. This runs the release binary over
+  # a larger input at several thread counts and diffs the output, which is where
+  # a reduction-order regression would actually show.
+  determinism:
+    name: Output does not depend on the worker count
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked
+      - name: Generate a dataset large enough for the summation order to matter
+        run: python3 .github/scripts/make_determinism_input.py
+      - name: Every estimator agrees across thread counts
+        run: bash .github/scripts/check_determinism.sh
+
+  audit:
+    name: cargo audit (advisory, non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Audit dependencies
+        run: cargo audit

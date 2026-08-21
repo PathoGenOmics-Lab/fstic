@@ -1,0 +1,58 @@
+# Which part of the project a pull request touches, worked out from the files it
+# changes. The labels exist so that "what changed in the estimators" is a
+# question the pull request list can answer; applying them by hand is how they
+# stop being applied.
+#
+# The issue forms label their own issues, so this only has to cover pull
+# requests.
+#
+# Format is actions/labeler v5, which is not v4's: a bare list of globs under
+# the label name silently matches nothing.
+
+estimators:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/calculation/**"
+          - "src/calculation.rs"
+
+io:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/io/**"
+          - "src/io.rs"
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/cli.rs"
+          - "src/main.rs"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "mkdocs.yml"
+          - "README.md"
+          - "CHANGELOG.md"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
+          - "src/calculation/tests.rs"
+
+packaging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - ".github/workflows/release.yml"
+
+# Everything under .github, not a list of the files there. Naming them one by
+# one would leave `.github/labeler.yml` itself uncovered, so the pull request
+# adding a rule to this file would arrive with no label, which is a small thing
+# that says exactly how the list would age.
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"

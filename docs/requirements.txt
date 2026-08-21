@@ -1,5 +1,5 @@
 # Documentation site (MkDocs Material). Build locally with:
-#   pip install -r requirements-docs.txt
+#   pip install -r docs/requirements.txt
 #   mkdocs serve
 #
 # mkdocs is pinned below 2.0: it drops the plugin system and theme overrides

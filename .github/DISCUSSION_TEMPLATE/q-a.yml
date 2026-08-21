@@ -1,0 +1,35 @@
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before asking, the two pages that answer most questions are
+        [choosing an estimator](https://pathogenomics-lab.github.io/fstic/guide/metrics/)
+        and [the model](https://pathogenomics-lab.github.io/fstic/how-it-works/model/).
+        The second one covers what an absent record means and why a pairwise
+        distance does not move when another sample joins the run.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Your data and command
+      description: >
+        The kind of data (consensus calls, within-host frequencies, pooled),
+        roughly how many samples and sites, and the command you ran. The stderr
+        block is useful here too: the warning counts often answer the question
+        on their own.
+      render: shell
+
+  - type: dropdown
+    id: formula
+    attributes:
+      label: Which estimator are you using?
+      multiple: true
+      options: [fst, gst, nei, chord, bray-curtis, jost_d, reynolds, rogers, "not sure yet"]
