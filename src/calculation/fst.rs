@@ -16,7 +16,11 @@ pub fn calculate_fst_for_pair(
         let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
         let h_s = (heterozygosity(&psf.freqs1) + heterozygosity(&psf.freqs2)) / 2.0;
         let h_t = pooled_heterozygosity(&psf);
-        if h_t > 0.0 { (h_t - h_s) / h_t } else { 0.0 }
+        if h_t > 0.0 {
+            (h_t - h_s) / h_t
+        } else {
+            0.0
+        }
     });
 
     if normalize && num_loci > 0 {

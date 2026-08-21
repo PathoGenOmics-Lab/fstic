@@ -1,14 +1,14 @@
+pub mod bray_curtis;
+pub mod chord;
 pub mod common;
 pub mod fst;
-#[cfg(test)]
-mod tests;
 pub mod gst;
-pub mod nei;
-pub mod chord;
-pub mod bray_curtis;
 pub mod jost_d;
+pub mod nei;
 pub mod reynolds;
 pub mod rogers;
+#[cfg(test)]
+mod tests;
 
 pub fn generate_sample_pairs(samples: &[String]) -> Vec<(usize, usize)> {
     let n = samples.len();
@@ -24,7 +24,10 @@ pub fn generate_sample_pairs(samples: &[String]) -> Vec<(usize, usize)> {
     pairs
 }
 
-pub fn create_distance_matrix(results: &[((usize, usize), f64)], num_samples: usize) -> Vec<Vec<f64>> {
+pub fn create_distance_matrix(
+    results: &[((usize, usize), f64)],
+    num_samples: usize,
+) -> Vec<Vec<f64>> {
     let mut matrix = vec![vec![0.0; num_samples]; num_samples];
     for &((i, j), dist) in results {
         matrix[i][j] = dist;

@@ -3,7 +3,10 @@ use crate::types::{AlleleFrequencies, GenomicPos, PositionalData, SiteData};
 use std::collections::HashMap;
 
 fn gp(pos: usize) -> GenomicPos {
-    GenomicPos { chrom: "chr1".into(), pos }
+    GenomicPos {
+        chrom: "chr1".into(),
+        pos,
+    }
 }
 
 fn make_site(ref_allele: &str, alts: &[(&str, f64)]) -> SiteData {
@@ -11,7 +14,10 @@ fn make_site(ref_allele: &str, alts: &[(&str, f64)]) -> SiteData {
     for &(a, f) in alts {
         freqs.insert(a.to_string(), f);
     }
-    SiteData { reference_allele: ref_allele.to_string(), freqs }
+    SiteData {
+        reference_allele: ref_allele.to_string(),
+        freqs,
+    }
 }
 
 /// (position, reference allele, [(alt allele, frequency)]).
@@ -60,7 +66,14 @@ fn freqs_clamp_negative_ref() {
 fn freqs_no_ref() {
     // REF unknown: the missing mass still has to go somewhere, so a placeholder
     // reference allele carries it and the profile stays a distribution.
-    let s1 = SiteData { reference_allele: String::new(), freqs: { let mut f = AlleleFrequencies::new(); f.insert("T".into(), 0.5); f } };
+    let s1 = SiteData {
+        reference_allele: String::new(),
+        freqs: {
+            let mut f = AlleleFrequencies::new();
+            f.insert("T".into(), 0.5);
+            f
+        },
+    };
     let psf = get_all_freqs_at_pos(Some(&s1), None);
     assert_eq!(psf.freqs1.len(), 2);
     let sum: f64 = psf.freqs1.values().sum();
@@ -95,23 +108,47 @@ fn absent_site_is_neutral_for_cumulative_metrics() {
 
     macro_rules! same {
         ($a:expr, $b:expr, $name:literal) => {
-            assert!(($a - $b).abs() < 1e-10, "{} changed when an absent locus was added: {} vs {}", $name, $a, $b);
+            assert!(
+                ($a - $b).abs() < 1e-10,
+                "{} changed when an absent locus was added: {} vs {}",
+                $name,
+                $a,
+                $b
+            );
         };
     }
 
     use crate::calculation::*;
-    same!(fst::calculate_fst_for_pair(&d1, &d2, &one, false, 1),
-          fst::calculate_fst_for_pair(&d1, &d2, &with_absent, false, 2), "fst");
-    same!(gst::calculate_gst_for_pair(&d1, &d2, &one),
-          gst::calculate_gst_for_pair(&d1, &d2, &with_absent), "gst");
-    same!(chord::calculate_chord_distance_for_pair(&d1, &d2, &one, false, 1),
-          chord::calculate_chord_distance_for_pair(&d1, &d2, &with_absent, false, 2), "chord");
-    same!(bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &one, false, 1),
-          bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &with_absent, false, 2), "bray-curtis");
-    same!(jost_d::calculate_jost_d_for_pair(&d1, &d2, &one, false, 1),
-          jost_d::calculate_jost_d_for_pair(&d1, &d2, &with_absent, false, 2), "jost_d");
-    same!(reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &one),
-          reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &with_absent), "reynolds");
+    same!(
+        fst::calculate_fst_for_pair(&d1, &d2, &one, false, 1),
+        fst::calculate_fst_for_pair(&d1, &d2, &with_absent, false, 2),
+        "fst"
+    );
+    same!(
+        gst::calculate_gst_for_pair(&d1, &d2, &one),
+        gst::calculate_gst_for_pair(&d1, &d2, &with_absent),
+        "gst"
+    );
+    same!(
+        chord::calculate_chord_distance_for_pair(&d1, &d2, &one, false, 1),
+        chord::calculate_chord_distance_for_pair(&d1, &d2, &with_absent, false, 2),
+        "chord"
+    );
+    same!(
+        bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &one, false, 1),
+        bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &with_absent, false, 2),
+        "bray-curtis"
+    );
+    same!(
+        jost_d::calculate_jost_d_for_pair(&d1, &d2, &one, false, 1),
+        jost_d::calculate_jost_d_for_pair(&d1, &d2, &with_absent, false, 2),
+        "jost_d"
+    );
+    same!(
+        reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &one),
+        reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &with_absent),
+        "reynolds"
+    );
 }
 
 /// A shared monomorphic locus is genetic identity, so it can only pull Nei's D
@@ -122,7 +159,12 @@ fn absent_site_adds_identity_to_nei() {
     let d2 = make_data(&[(100, "A", &[("T", 0.2)])]);
     let near = crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100]));
     let far = crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100, 999]));
-    assert!(far < near, "a shared monomorphic locus must reduce Nei's D: {} vs {}", far, near);
+    assert!(
+        far < near,
+        "a shared monomorphic locus must reduce Nei's D: {} vs {}",
+        far,
+        near
+    );
     assert!(far > 0.0);
 }
 
@@ -133,9 +175,15 @@ fn identical_samples_zero_despite_foreign_loci() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let p = gps(&[100, 200, 300, 400]);
-    assert!(crate::calculation::chord::calculate_chord_distance_for_pair(&d1, &d2, &p, false, 4).abs() < 1e-10);
+    assert!(
+        crate::calculation::chord::calculate_chord_distance_for_pair(&d1, &d2, &p, false, 4).abs()
+            < 1e-10
+    );
     assert!(crate::calculation::gst::calculate_gst_for_pair(&d1, &d2, &p).abs() < 1e-10);
-    assert!(crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &p, 4).abs() < 1e-10);
+    assert!(
+        crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &p, 4).abs()
+            < 1e-10
+    );
 }
 
 #[test]
@@ -151,20 +199,25 @@ fn freqs_multiallelic() {
 
 #[test]
 fn het_monomorphic() {
-    let mut f = AlleleFrequencies::new(); f.insert("A".into(), 1.0);
+    let mut f = AlleleFrequencies::new();
+    f.insert("A".into(), 1.0);
     assert!((heterozygosity(&f)).abs() < 1e-10);
     assert!((homozygosity(&f) - 1.0).abs() < 1e-10);
 }
 
 #[test]
 fn het_biallelic() {
-    let mut f = AlleleFrequencies::new(); f.insert("A".into(), 0.5); f.insert("T".into(), 0.5);
+    let mut f = AlleleFrequencies::new();
+    f.insert("A".into(), 0.5);
+    f.insert("T".into(), 0.5);
     assert!((heterozygosity(&f) - 0.5).abs() < 1e-10);
 }
 
 #[test]
 fn het_plus_hom() {
-    let mut f = AlleleFrequencies::new(); f.insert("A".into(), 0.7); f.insert("T".into(), 0.3);
+    let mut f = AlleleFrequencies::new();
+    f.insert("A".into(), 0.7);
+    f.insert("T".into(), 0.3);
     assert!((heterozygosity(&f) + homozygosity(&f) - 1.0).abs() < 1e-10);
 }
 
@@ -209,8 +262,10 @@ fn fst_fixed_one() {
 fn fst_normalized() {
     let d1 = make_data(&[(100, "A", &[("T", 0.8)]), (200, "C", &[("G", 0.8)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.2)]), (200, "C", &[("G", 0.2)])]);
-    let raw = crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100, 200]), false, 2);
-    let norm = crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100, 200]), true, 2);
+    let raw =
+        crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100, 200]), false, 2);
+    let norm =
+        crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100, 200]), true, 2);
     assert!((norm - raw / 2.0).abs() < 1e-10);
 }
 
@@ -237,7 +292,10 @@ fn gst_identical_zero() {
 fn gst_fixed_one() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    assert!((crate::calculation::gst::calculate_gst_for_pair(&d1, &d2, &gps(&[100])) - 1.0).abs() < 1e-10);
+    assert!(
+        (crate::calculation::gst::calculate_gst_for_pair(&d1, &d2, &gps(&[100])) - 1.0).abs()
+            < 1e-10
+    );
 }
 
 // ── Jost's D ────────────────────────────────────────────────────────
@@ -246,14 +304,23 @@ fn gst_fixed_one() {
 fn jost_d_identical_zero() {
     let d1 = make_data(&[(100, "A", &[("T", 0.3)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.3)])]);
-    assert!(crate::calculation::jost_d::calculate_jost_d_for_pair(&d1, &d2, &gps(&[100]), false, 1).abs() < 1e-10);
+    assert!(
+        crate::calculation::jost_d::calculate_jost_d_for_pair(&d1, &d2, &gps(&[100]), false, 1)
+            .abs()
+            < 1e-10
+    );
 }
 
 #[test]
 fn jost_d_fixed_one() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    assert!((crate::calculation::jost_d::calculate_jost_d_for_pair(&d1, &d2, &gps(&[100]), false, 1) - 1.0).abs() < 1e-10);
+    assert!(
+        (crate::calculation::jost_d::calculate_jost_d_for_pair(&d1, &d2, &gps(&[100]), false, 1)
+            - 1.0)
+            .abs()
+            < 1e-10
+    );
 }
 
 #[test]
@@ -262,7 +329,13 @@ fn jost_d_non_negative() {
         for af2 in &[0.0, 0.3, 0.5, 0.7, 1.0] {
             let d1 = make_data(&[(100, "A", &[("T", *af1)])]);
             let d2 = make_data(&[(100, "A", &[("T", *af2)])]);
-            let d = crate::calculation::jost_d::calculate_jost_d_for_pair(&d1, &d2, &gps(&[100]), false, 1);
+            let d = crate::calculation::jost_d::calculate_jost_d_for_pair(
+                &d1,
+                &d2,
+                &gps(&[100]),
+                false,
+                1,
+            );
             assert!(d >= -1e-10);
         }
     }
@@ -283,14 +356,20 @@ fn jost_d_symmetric() {
 fn nei_identical_zero() {
     let d1 = make_data(&[(100, "A", &[("T", 0.4)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.4)])]);
-    assert!(crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100])).abs() < 1e-10);
+    assert!(
+        crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100])).abs()
+            < 1e-10
+    );
 }
 
 #[test]
 fn nei_fixed_inf() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    assert!(crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100])).is_infinite());
+    assert!(
+        crate::calculation::nei::calculate_nei_distance_for_pair(&d1, &d2, &gps(&[100]))
+            .is_infinite()
+    );
 }
 
 #[test]
@@ -308,14 +387,30 @@ fn nei_symmetric() {
 fn chord_identical_zero() {
     let d1 = make_data(&[(100, "A", &[("T", 0.5)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.5)])]);
-    assert!(crate::calculation::chord::calculate_chord_distance_for_pair(&d1, &d2, &gps(&[100]), false, 1).abs() < 1e-10);
+    assert!(
+        crate::calculation::chord::calculate_chord_distance_for_pair(
+            &d1,
+            &d2,
+            &gps(&[100]),
+            false,
+            1
+        )
+        .abs()
+            < 1e-10
+    );
 }
 
 #[test]
 fn chord_fixed() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    let d = crate::calculation::chord::calculate_chord_distance_for_pair(&d1, &d2, &gps(&[100]), false, 1);
+    let d = crate::calculation::chord::calculate_chord_distance_for_pair(
+        &d1,
+        &d2,
+        &gps(&[100]),
+        false,
+        1,
+    );
     assert!((d - 2.0_f64.sqrt()).abs() < 1e-10);
 }
 
@@ -325,14 +420,34 @@ fn chord_fixed() {
 fn bc_identical_zero() {
     let d1 = make_data(&[(100, "A", &[("T", 0.3)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.3)])]);
-    assert!(crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &gps(&[100]), false, 1).abs() < 1e-10);
+    assert!(
+        crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(
+            &d1,
+            &d2,
+            &gps(&[100]),
+            false,
+            1
+        )
+        .abs()
+            < 1e-10
+    );
 }
 
 #[test]
 fn bc_fixed() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    assert!((crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &gps(&[100]), false, 1) - 1.0).abs() < 1e-10);
+    assert!(
+        (crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(
+            &d1,
+            &d2,
+            &gps(&[100]),
+            false,
+            1
+        ) - 1.0)
+            .abs()
+            < 1e-10
+    );
 }
 
 #[test]
@@ -340,7 +455,13 @@ fn bc_bounded() {
     for af in &[0.0, 0.2, 0.5, 0.8, 1.0] {
         let d1 = make_data(&[(100, "A", &[("T", *af)])]);
         let d2 = make_data(&[(100, "A", &[("T", 1.0 - af)])]);
-        let d = crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &gps(&[100]), false, 1);
+        let d = crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(
+            &d1,
+            &d2,
+            &gps(&[100]),
+            false,
+            1,
+        );
         assert!((-1e-10..=1.0 + 1e-10).contains(&d));
     }
 }
@@ -351,14 +472,21 @@ fn bc_bounded() {
 fn reynolds_identical_zero() {
     let d1 = make_data(&[(100, "A", &[("T", 0.5)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.5)])]);
-    assert!(crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100])).abs() < 1e-10);
+    assert!(
+        crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100]))
+            .abs()
+            < 1e-10
+    );
 }
 
 #[test]
 fn reynolds_fixed_inf() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    assert!(crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100])).is_infinite());
+    assert!(
+        crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100]))
+            .is_infinite()
+    );
 }
 
 /// At intermediate frequencies the coancestry estimator and Nei's GST diverge, so
@@ -369,8 +497,13 @@ fn reynolds_uses_coancestry_not_gst() {
     // theta = ((0.5)^2 + (0.5)^2)/2 / (1 - 0.5) = 0.25/0.5 = 0.5
     let d1 = make_data(&[(100, "A", &[("T", 0.5)])]);
     let d2 = make_data(&[(100, "A", &[("T", 1.0)])]);
-    let d = crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100]));
-    assert!((d - (2.0_f64).ln()).abs() < 1e-10, "expected -ln(0.5), got {}", d);
+    let d =
+        crate::calculation::reynolds::calculate_reynolds_distance_for_pair(&d1, &d2, &gps(&[100]));
+    assert!(
+        (d - (2.0_f64).ln()).abs() < 1e-10,
+        "expected -ln(0.5), got {}",
+        d
+    );
 }
 
 #[test]
@@ -390,14 +523,23 @@ fn reynolds_symmetric() {
 fn rogers_identical_zero() {
     let d1 = make_data(&[(100, "A", &[("T", 0.5)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.5)])]);
-    assert!(crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &gps(&[100]), 1).abs() < 1e-10);
+    assert!(
+        crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &gps(&[100]), 1)
+            .abs()
+            < 1e-10
+    );
 }
 
 #[test]
 fn rogers_fixed() {
     let d1 = make_data(&[(100, "A", &[("T", 1.0)])]);
     let d2 = make_data(&[(100, "A", &[])]);
-    assert!((crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &gps(&[100]), 1) - 1.0).abs() < 1e-10);
+    assert!(
+        (crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &gps(&[100]), 1)
+            - 1.0)
+            .abs()
+            < 1e-10
+    );
 }
 
 #[test]
@@ -405,7 +547,12 @@ fn rogers_bounded() {
     for af in &[0.0, 0.2, 0.5, 0.8, 1.0] {
         let d1 = make_data(&[(100, "A", &[("T", *af)])]);
         let d2 = make_data(&[(100, "A", &[("T", 1.0 - af)])]);
-        let d = crate::calculation::rogers::calculate_rogers_distance_for_pair(&d1, &d2, &gps(&[100]), 1);
+        let d = crate::calculation::rogers::calculate_rogers_distance_for_pair(
+            &d1,
+            &d2,
+            &gps(&[100]),
+            1,
+        );
         assert!((-1e-10..=1.0 + 1e-10).contains(&d));
     }
 }
@@ -419,10 +566,14 @@ fn pairs_count() {
 }
 
 #[test]
-fn pairs_empty() { assert!(crate::calculation::generate_sample_pairs(&[]).is_empty()); }
+fn pairs_empty() {
+    assert!(crate::calculation::generate_sample_pairs(&[]).is_empty());
+}
 
 #[test]
-fn pairs_single() { assert!(crate::calculation::generate_sample_pairs(&["s1".into()]).is_empty()); }
+fn pairs_single() {
+    assert!(crate::calculation::generate_sample_pairs(&["s1".into()]).is_empty());
+}
 
 #[test]
 fn matrix_symmetric() {
@@ -462,10 +613,7 @@ fn non_finite_cells_written_as_na() {
     use crate::io::csv::write_distance_matrix;
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out.csv");
-    let m = vec![
-        vec![0.0, f64::INFINITY],
-        vec![f64::INFINITY, 0.0],
-    ];
+    let m = vec![vec![0.0, f64::INFINITY], vec![f64::INFINITY, 0.0]];
     write_distance_matrix(out.to_str().unwrap(), &m, &["A".into(), "B".into()], false).unwrap();
 
     let c = std::fs::read_to_string(&out).unwrap();
@@ -477,7 +625,8 @@ fn non_finite_cells_written_as_na() {
 fn fst_multi_locus() {
     let d1 = make_data(&[(100, "A", &[("T", 0.9)]), (200, "C", &[("G", 0.1)])]);
     let d2 = make_data(&[(100, "A", &[("T", 0.1)]), (200, "C", &[("G", 0.9)])]);
-    let fst = crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100, 200]), false, 2);
+    let fst =
+        crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100, 200]), false, 2);
     let single = crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &gps(&[100]), false, 1);
     assert!((fst - 2.0 * single).abs() < 1e-10);
 }
@@ -486,8 +635,14 @@ fn fst_multi_locus() {
 
 #[test]
 fn different_chroms_are_distinct_sites() {
-    let pos_a = GenomicPos { chrom: "chr1".into(), pos: 100 };
-    let pos_b = GenomicPos { chrom: "chr2".into(), pos: 100 };
+    let pos_a = GenomicPos {
+        chrom: "chr1".into(),
+        pos: 100,
+    };
+    let pos_b = GenomicPos {
+        chrom: "chr2".into(),
+        pos: 100,
+    };
     assert_ne!(pos_a, pos_b);
 
     // Same position number on different chroms should be independent
@@ -501,7 +656,10 @@ fn different_chroms_are_distinct_sites() {
 
     let positions = vec![pos_a, pos_b];
     let fst = crate::calculation::fst::calculate_fst_for_pair(&d1, &d2, &positions, false, 2);
-    assert!(fst > 0.0, "Different chroms should contribute independently");
+    assert!(
+        fst > 0.0,
+        "Different chroms should contribute independently"
+    );
 }
 
 // ── FASTA ───────────────────────────────────────────────────────────
@@ -581,7 +739,10 @@ fn fasta_records_stay_separate() {
 fn saturated_site_is_rescaled() {
     // Split multi-allelic records: two independently estimated 0.9 frequencies.
     let mut sv = crate::types::SampleVariants::new();
-    sv.insert("s1".to_string(), make_data(&[(100, "A", &[("T", 0.9), ("G", 0.9)])]));
+    sv.insert(
+        "s1".to_string(),
+        make_data(&[(100, "A", &[("T", 0.9), ("G", 0.9)])]),
+    );
     assert_eq!(crate::io::renormalise_saturated_sites(&mut sv), 1);
 
     let freqs = &sv["s1"][&gp(100)].freqs;
@@ -596,7 +757,10 @@ fn saturated_site_is_rescaled() {
 #[test]
 fn well_formed_sites_are_left_alone() {
     let mut sv = crate::types::SampleVariants::new();
-    sv.insert("s1".to_string(), make_data(&[(100, "A", &[("T", 0.3)]), (200, "C", &[("G", 1.0)])]));
+    sv.insert(
+        "s1".to_string(),
+        make_data(&[(100, "A", &[("T", 0.3)]), (200, "C", &[("G", 1.0)])]),
+    );
     assert_eq!(crate::io::renormalise_saturated_sites(&mut sv), 0);
     assert!((sv["s1"][&gp(100)].freqs["T"] - 0.3).abs() < 1e-10);
 }
@@ -604,7 +768,10 @@ fn well_formed_sites_are_left_alone() {
 #[test]
 fn rounding_noise_is_not_rescaled() {
     let mut sv = crate::types::SampleVariants::new();
-    sv.insert("s1".to_string(), make_data(&[(100, "A", &[("T", 1.0 + 1e-12)])]));
+    sv.insert(
+        "s1".to_string(),
+        make_data(&[(100, "A", &[("T", 1.0 + 1e-12)])]),
+    );
     assert_eq!(crate::io::renormalise_saturated_sites(&mut sv), 0);
 }
 
@@ -620,8 +787,10 @@ fn all_metrics_symmetric() {
     let f21 = crate::calculation::fst::calculate_fst_for_pair(&d2, &d1, &p, false, 1);
     assert!((f12 - f21).abs() < 1e-10);
 
-    let b12 = crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &p, false, 1);
-    let b21 = crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d2, &d1, &p, false, 1);
+    let b12 =
+        crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d1, &d2, &p, false, 1);
+    let b21 =
+        crate::calculation::bray_curtis::calculate_bray_curtis_for_pair(&d2, &d1, &p, false, 1);
     assert!((b12 - b21).abs() < 1e-10);
 
     let c12 = crate::calculation::chord::calculate_chord_distance_for_pair(&d1, &d2, &p, false, 1);
@@ -640,7 +809,13 @@ fn write_csv() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out.csv");
     let m = vec![vec![0.0, 0.5], vec![0.5, 0.0]];
-    crate::io::csv::write_distance_matrix(out.to_str().unwrap(), &m, &["A".into(), "B".into()], false).unwrap();
+    crate::io::csv::write_distance_matrix(
+        out.to_str().unwrap(),
+        &m,
+        &["A".into(), "B".into()],
+        false,
+    )
+    .unwrap();
     let c = std::fs::read_to_string(&out).unwrap();
     assert!(c.starts_with("sample,"));
     assert!(c.contains("A,0.0000000000,0.5000000000"));
@@ -651,7 +826,13 @@ fn write_tsv() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out.tsv");
     let m = vec![vec![0.0, 0.5], vec![0.5, 0.0]];
-    crate::io::csv::write_distance_matrix(out.to_str().unwrap(), &m, &["A".into(), "B".into()], true).unwrap();
+    crate::io::csv::write_distance_matrix(
+        out.to_str().unwrap(),
+        &m,
+        &["A".into(), "B".into()],
+        true,
+    )
+    .unwrap();
     let c = std::fs::read_to_string(&out).unwrap();
     assert!(c.starts_with("sample\t"));
 }

@@ -1,11 +1,11 @@
-mod cli;
-mod types;
-mod io;
 mod calculation;
+mod cli;
+mod io;
+mod types;
 
-use clap::Parser;
 use crate::cli::{Args, Formula, InputMode};
 use crate::types::FilterCriteria;
+use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::process::ExitCode;
@@ -35,17 +35,25 @@ fn run() -> Result<(), String> {
     eprintln!("> Minimum Depth (DP): {}", criteria.min_depth);
     eprintln!("> Minimum Allele Freq (AF): {}", criteria.min_freq);
     eprintln!("> Minimum Alternate Reads (AD): {}", criteria.min_alt_reads);
-    eprintln!("> Minimum Alt. Reverse Reads (ADR): {}", criteria.min_alt_rev_reads);
+    eprintln!(
+        "> Minimum Alt. Reverse Reads (ADR): {}",
+        criteria.min_alt_rev_reads
+    );
     eprintln!("------------------------\n");
 
     args.configure_thread_pool();
 
     // Read reference if provided
-    let reference = args.reference.as_ref().map(|path| {
-        let path_str = path.to_str().unwrap_or_default();
-        eprintln!("Reading reference FASTA...");
-        io::fasta::read_reference(path_str)
-    }).transpose().map_err(|e| format!("Reference error: {}", e))?;
+    let reference = args
+        .reference
+        .as_ref()
+        .map(|path| {
+            let path_str = path.to_str().unwrap_or_default();
+            eprintln!("Reading reference FASTA...");
+            io::fasta::read_reference(path_str)
+        })
+        .transpose()
+        .map_err(|e| format!("Reference error: {}", e))?;
 
     // Read input files
     eprintln!("Reading {} input files...", files.len());
@@ -72,7 +80,8 @@ fn run() -> Result<(), String> {
         // still resolves. With several contigs there is nothing to guess from, and
         // silently reading the wrong contig's base corrupts every distance.
         let single_contig = genome.len() == 1;
-        let mut unknown_chroms: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        let mut unknown_chroms: std::collections::BTreeSet<&str> =
+            std::collections::BTreeSet::new();
         let mut out_of_range = 0usize;
 
         for gpos in &position_set {
@@ -106,7 +115,11 @@ fn run() -> Result<(), String> {
                  Reference alleles were not imputed there.",
                 unknown_chroms.len(),
                 names.join(", "),
-                if unknown_chroms.len() > names.len() { ", ..." } else { "" }
+                if unknown_chroms.len() > names.len() {
+                    ", ..."
+                } else {
+                    ""
+                }
             );
         }
         if out_of_range > 0 {
@@ -137,7 +150,9 @@ fn run() -> Result<(), String> {
             }
         }
 
-        let mut conflicting = ref_alleles_by_pos.iter().filter(|(_, alleles)| alleles.len() > 1);
+        let mut conflicting = ref_alleles_by_pos
+            .iter()
+            .filter(|(_, alleles)| alleles.len() > 1);
         if let Some((gpos, alleles)) = conflicting.next() {
             let n = 1 + conflicting.count();
             let listed: Vec<&str> = alleles.iter().copied().collect();
@@ -154,7 +169,10 @@ fn run() -> Result<(), String> {
     }
 
     if variants_by_sample.is_empty() {
-        return Err("No samples found after filtering. Check input files and filter thresholds.".to_string());
+        return Err(
+            "No samples found after filtering. Check input files and filter thresholds."
+                .to_string(),
+        );
     }
 
     if position_set.is_empty() {
@@ -212,14 +230,51 @@ fn run() -> Result<(), String> {
             let data2 = variants_by_sample.get(&samples[j]).unwrap();
 
             let dist = match formula {
-                Formula::Fst => calculation::fst::calculate_fst_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Formula::Gst => calculation::gst::calculate_gst_for_pair(data1, data2, &all_positions),
-                Formula::Nei => calculation::nei::calculate_nei_distance_for_pair(data1, data2, &all_positions),
-                Formula::Chord => calculation::chord::calculate_chord_distance_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Formula::BrayCurtis => calculation::bray_curtis::calculate_bray_curtis_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Formula::JostD => calculation::jost_d::calculate_jost_d_for_pair(data1, data2, &all_positions, normalize, num_loci),
-                Formula::Reynolds => calculation::reynolds::calculate_reynolds_distance_for_pair(data1, data2, &all_positions),
-                Formula::Rogers => calculation::rogers::calculate_rogers_distance_for_pair(data1, data2, &all_positions, num_loci),
+                Formula::Fst => calculation::fst::calculate_fst_for_pair(
+                    data1,
+                    data2,
+                    &all_positions,
+                    normalize,
+                    num_loci,
+                ),
+                Formula::Gst => {
+                    calculation::gst::calculate_gst_for_pair(data1, data2, &all_positions)
+                }
+                Formula::Nei => {
+                    calculation::nei::calculate_nei_distance_for_pair(data1, data2, &all_positions)
+                }
+                Formula::Chord => calculation::chord::calculate_chord_distance_for_pair(
+                    data1,
+                    data2,
+                    &all_positions,
+                    normalize,
+                    num_loci,
+                ),
+                Formula::BrayCurtis => calculation::bray_curtis::calculate_bray_curtis_for_pair(
+                    data1,
+                    data2,
+                    &all_positions,
+                    normalize,
+                    num_loci,
+                ),
+                Formula::JostD => calculation::jost_d::calculate_jost_d_for_pair(
+                    data1,
+                    data2,
+                    &all_positions,
+                    normalize,
+                    num_loci,
+                ),
+                Formula::Reynolds => calculation::reynolds::calculate_reynolds_distance_for_pair(
+                    data1,
+                    data2,
+                    &all_positions,
+                ),
+                Formula::Rogers => calculation::rogers::calculate_rogers_distance_for_pair(
+                    data1,
+                    data2,
+                    &all_positions,
+                    num_loci,
+                ),
             };
             pb.inc(1);
             ((i, j), dist)
@@ -244,7 +299,12 @@ fn run() -> Result<(), String> {
          > Output: {}\n\
          > Time: {:.2}s\n\
          ---------------",
-        samples.len(), num_loci, sample_pairs.len(), formula, output_path_str, elapsed.as_secs_f64()
+        samples.len(),
+        num_loci,
+        sample_pairs.len(),
+        formula,
+        output_path_str,
+        elapsed.as_secs_f64()
     );
 
     Ok(())

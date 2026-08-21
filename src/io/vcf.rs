@@ -84,7 +84,11 @@ pub fn read_vcf_files(
 
     for p in &parsed {
         if let Some(err) = &p.io_error {
-            return Err(format!("Error reading VCF file {}: {}", p.path.display(), err));
+            return Err(format!(
+                "Error reading VCF file {}: {}",
+                p.path.display(),
+                err
+            ));
         }
         if p.data_lines == 0 {
             return Err(format!(
@@ -157,11 +161,7 @@ struct ParsedVcf {
     io_error: Option<String>,
 }
 
-fn parse_and_filter_vcf(
-    file: &Path,
-    criteria: &FilterCriteria,
-    stats: &VcfStats,
-) -> ParsedVcf {
+fn parse_and_filter_vcf(file: &Path, criteria: &FilterCriteria, stats: &VcfStats) -> ParsedVcf {
     // Sample ID from filename (one VCF per sample is the expected input model)
     let sample_id = file
         .file_stem()
@@ -266,9 +266,7 @@ fn parse_and_filter_vcf(
             let depth_ok = v.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
             let freq_ok = v.alt_freq >= criteria.min_freq;
             let alt_reads_ok = v.alt_dp.is_none_or(|ad| ad >= criteria.min_alt_reads);
-            let alt_rev_reads_ok = v
-                .alt_rv
-                .is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
+            let alt_rev_reads_ok = v.alt_rv.is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
             depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
         })
         .collect();
@@ -418,7 +416,7 @@ fn parse_vcf_line(
         alt_allele: fields[4].to_string(),
         total_dp,
         alt_dp,
-        alt_freq,  // guaranteed non-None by the ? above
+        alt_freq, // guaranteed non-None by the ? above
         alt_rv,
     })
 }

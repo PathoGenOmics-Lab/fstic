@@ -13,13 +13,21 @@ pub fn calculate_bray_curtis_for_pair(
 ) -> f64 {
     let sum_dist = sum_per_locus(all_positions, |pos| {
         let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
-        let abs_diff: f64 = psf.all_alleles.iter().map(|a| {
-            let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
-            let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
-            (p - q).abs()
-        }).sum();
+        let abs_diff: f64 = psf
+            .all_alleles
+            .iter()
+            .map(|a| {
+                let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+                let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+                (p - q).abs()
+            })
+            .sum();
         0.5 * abs_diff
     });
 
-    if normalize && num_loci > 0 { sum_dist / num_loci as f64 } else { sum_dist }
+    if normalize && num_loci > 0 {
+        sum_dist / num_loci as f64
+    } else {
+        sum_dist
+    }
 }

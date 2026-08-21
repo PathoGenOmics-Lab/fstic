@@ -28,7 +28,11 @@ pub fn calculate_nei_distance_for_pair(
     let denom = (j_x * j_y).sqrt();
     if denom > 0.0 {
         let identity = j_xy / denom;
-        if identity > 0.0 { -identity.ln() } else { f64::INFINITY }
+        if identity > 0.0 {
+            -identity.ln()
+        } else {
+            f64::INFINITY
+        }
     } else {
         f64::INFINITY
     }

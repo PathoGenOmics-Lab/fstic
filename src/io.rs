@@ -3,9 +3,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Error};
 use std::path::PathBuf;
 
-pub mod vcf;
 pub mod csv;
 pub mod fasta;
+pub mod vcf;
 
 /// Rescales any site whose allele frequencies sum above 1 back to a distribution,
 /// returning how many sites were touched.
