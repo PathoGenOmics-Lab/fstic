@@ -88,7 +88,11 @@ pub fn get_all_freqs_at_pos(
     let ref_allele = site1_data
         .map(|d| &d.reference_allele)
         .filter(|r| !r.is_empty())
-        .or_else(|| site2_data.map(|d| &d.reference_allele).filter(|r| !r.is_empty()))
+        .or_else(|| {
+            site2_data
+                .map(|d| &d.reference_allele)
+                .filter(|r| !r.is_empty())
+        })
         .cloned()
         .unwrap_or_else(|| UNKNOWN_REF.to_string());
 

@@ -16,5 +16,9 @@ pub fn calculate_gst_for_pair(
         [h_t - h_s, h_t]
     });
 
-    if total_den > 0.0 { total_num / total_den } else { 0.0 }
+    if total_den > 0.0 {
+        total_num / total_den
+    } else {
+        0.0
+    }
 }

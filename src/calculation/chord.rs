@@ -14,14 +14,26 @@ pub fn calculate_chord_distance_for_pair(
 ) -> f64 {
     let sum_dist = sum_per_locus(all_positions, |pos| {
         let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
-        let sum_sqrt: f64 = psf.all_alleles.iter().map(|a| {
-            let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
-            let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
-            (p * q).sqrt()
-        }).sum();
+        let sum_sqrt: f64 = psf
+            .all_alleles
+            .iter()
+            .map(|a| {
+                let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+                let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+                (p * q).sqrt()
+            })
+            .sum();
         let term = 2.0 * (1.0 - sum_sqrt);
-        if term > 0.0 { term.sqrt() } else { 0.0 }
+        if term > 0.0 {
+            term.sqrt()
+        } else {
+            0.0
+        }
     });
 
-    if normalize && num_loci > 0 { sum_dist / num_loci as f64 } else { sum_dist }
+    if normalize && num_loci > 0 {
+        sum_dist / num_loci as f64
+    } else {
+        sum_dist
+    }
 }

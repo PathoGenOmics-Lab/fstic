@@ -62,6 +62,11 @@ theme:
     - content.tabs.link
     - content.tooltips
 
+# The docs build dependencies live in docs/ so Dependabot finds them next to
+# what they build, but they are not a page and should not ship with the site.
+exclude_docs: |
+  requirements.txt
+
 # Broken cross-references and dead anchors become warnings, which `mkdocs build
 # --strict` in CI turns into a failed build.
 validation:

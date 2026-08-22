@@ -10,7 +10,10 @@ pub type ReferenceGenome = BTreeMap<String, Vec<u8>>;
 /// Stores sequences as `Vec<u8>` (1 byte/base) instead of `Vec<char>` (4 bytes/base).
 pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
     let file = File::open(path).map_err(|e| {
-        Error::new(ErrorKind::NotFound, format!("Cannot open FASTA file '{}': {}", path, e))
+        Error::new(
+            ErrorKind::NotFound,
+            format!("Cannot open FASTA file '{}': {}", path, e),
+        )
     })?;
     let reader = BufReader::new(file);
     let mut genome = ReferenceGenome::new();
@@ -47,7 +50,11 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
                 ));
             }
             if record_open {
-                flush(&mut genome, std::mem::take(&mut current_name), std::mem::take(&mut current_seq))?;
+                flush(
+                    &mut genome,
+                    std::mem::take(&mut current_name),
+                    std::mem::take(&mut current_seq),
+                )?;
             }
             current_seq.clear();
             current_name = name.to_string();
@@ -56,7 +63,10 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
             if !record_open {
                 return Err(Error::new(
                     ErrorKind::InvalidData,
-                    format!("Sequence data before the first '>' header in FASTA file '{}'", path),
+                    format!(
+                        "Sequence data before the first '>' header in FASTA file '{}'",
+                        path
+                    ),
                 ));
             }
             // Uppercase to handle soft-masked references
@@ -68,7 +78,10 @@ pub fn read_reference(path: &str) -> Result<ReferenceGenome, Error> {
     }
 
     if genome.is_empty() {
-        return Err(Error::new(ErrorKind::InvalidData, "No sequences found in FASTA file"));
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "No sequences found in FASTA file",
+        ));
     }
 
     Ok(genome)

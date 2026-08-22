@@ -40,9 +40,12 @@ install -m 755 target/release/fstic ~/.local/bin/
 
 !!! note "Rust version"
 
-    The crate uses the 2021 edition and `Option::is_none_or`, so it needs Rust
-    1.82 or newer. `rustup update stable` if `cargo build` complains about an
-    unstable method.
+    Needs Rust **1.85** or newer, which is checked in CI on every pull request.
+    The floor comes from the dependency tree rather than from Fstic's own
+    source: `clap_lex` requires edition 2024. On 1.84 the build fails while
+    resolving, before it compiles anything.
+
+    `rustup update stable` if `cargo build` complains about `edition2024`.
 
 ## Running the test suite
 

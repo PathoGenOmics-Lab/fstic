@@ -70,7 +70,7 @@ all; the `off_diagonal` helper in `tests/integration.rs` exists for this.
 The site is MkDocs Material.
 
 ```bash
-pip install -r requirements-docs.txt
+pip install -r docs/requirements.txt
 mkdocs serve
 ```
 

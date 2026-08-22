@@ -1,0 +1,40 @@
+labels: ["studies"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If Fstic was part of an analysis you published or presented, we would
+        like to hear about it. Seeing which estimators people actually reach for,
+        and on what kind of data, is what tells us where the tool needs work.
+
+  - type: input
+    id: study
+    attributes:
+      label: The study
+      description: Title, and a DOI or link if there is one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use
+    attributes:
+      label: What did you use it for?
+      description: The organism, the kind of data, and what the distances fed into.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: formula
+    attributes:
+      label: Which estimator
+      multiple: true
+      options: [fst, gst, nei, chord, bray-curtis, jost_d, reynolds, rogers]
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: Anything that got in the way?
+      description: >
+        A step you had to script around, an output you had to reshape, a
+        default that was wrong for your data. This is the most useful box on
+        the form.

@@ -2,6 +2,11 @@
 name = "fstic"
 version = "1.0.1"
 edition = "2021"
+# The floor is set by the dependency tree, not by this crate's own source:
+# clap_lex requires edition2024, which needs 1.85. 1.84 fails to resolve at all.
+# CI verifies this; keep it equal to the `toolchain:` input in
+# .github/workflows/ci.yml.
+rust-version = "1.85"
 authors = ["Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>"]
 description = "High-performance pairwise genetic distance calculator from allele-frequency data"
 license = "GPL-3.0"

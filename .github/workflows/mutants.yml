@@ -1,0 +1,100 @@
+name: Mutation testing (advisory)
+
+# `cargo mutants` changes the source and reports whether the test suite notices.
+# A surviving mutant is a piece of logic no test distinguishes: either a test is
+# missing, or the logic does nothing, and both are worth knowing.
+#
+# Run by hand rather than on every push, because it builds and tests once per
+# mutant. It never fails the build: a surviving mutant is a question to look at,
+# not a defect.
+#
+# Scope, test selection and timeouts live in `.cargo/mutants.toml`, so a local
+# run matches this one.
+#
+# Split across four shards. The configured scope generates 355 mutants, and a
+# measured shard of 45 took 1m35s on a warm laptop, so the whole run is roughly
+# a quarter of an hour there and rather more on a runner. Four shards keep each
+# job comfortably inside its limit and let a failure be re-run cheaply.
+
+on:
+  workflow_dispatch:
+
+# It reads the repository, mutates a copy of the source in a scratch directory
+# and uploads a report as an artifact. It writes nothing back here.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mutants:
+    name: Shard ${{ matrix.shard }} of 0 to 3
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Zero-indexed, which the flag's own help does not say: it gives `1/4`
+        # as the example. Numbering these 1 to 4 would quietly skip shard 0 and
+        # run an empty shard 4, covering three quarters of the mutants while
+        # reporting a full set of results.
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --locked
+      - name: Run shard ${{ matrix.shard }}
+        # Never fails the job: the report is the output, not the exit code.
+        run: cargo mutants --shard ${{ matrix.shard }}/4 --no-shuffle || true
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-shard-${{ matrix.shard }}
+          path: mutants.out/
+          if-no-files-found: warn
+
+  summary:
+    name: Put the shards back together
+    needs: mutants
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mutants-shard-*
+          path: shards
+      # One list to read, rather than four artifacts to download and diff by
+      # hand. Written to the job summary so it is visible without downloading
+      # anything at all.
+      - name: Collect the survivors
+        run: |
+          set -euo pipefail
+          missed=$(cat shards/*/missed.txt 2>/dev/null | sort -u || true)
+          timeouts=$(cat shards/*/timeout.txt 2>/dev/null | sort -u || true)
+          {
+            echo "## Surviving mutants"
+            echo
+            if [ -z "$missed" ]; then
+              echo "None. Every mutant in scope was caught by the suite."
+            else
+              echo "Each line is a change to the source that no test noticed."
+              echo
+              echo '```'
+              echo "$missed"
+              echo '```'
+            fi
+            if [ -n "$timeouts" ]; then
+              echo
+              echo "## Timed out"
+              echo
+              echo '```'
+              echo "$timeouts"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$missed" | grep -c . | xargs echo "surviving mutants:"

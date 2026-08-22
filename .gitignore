@@ -3,3 +3,10 @@
 *.swo
 /site/
 .cache/
+
+# cargo-mutants scratch output
+/mutants.out/
+/mutants.out.old/
+
+# macOS
+.DS_Store

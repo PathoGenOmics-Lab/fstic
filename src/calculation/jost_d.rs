@@ -20,8 +20,16 @@ pub fn calculate_jost_d_for_pair(
         let h_s = (heterozygosity(&psf.freqs1) + heterozygosity(&psf.freqs2)) / 2.0;
         let h_t = pooled_heterozygosity(&psf);
         let denom = 1.0 - h_s;
-        if denom > 0.0 { correction * (h_t - h_s) / denom } else { 0.0 }
+        if denom > 0.0 {
+            correction * (h_t - h_s) / denom
+        } else {
+            0.0
+        }
     });
 
-    if normalize && num_loci > 0 { sum_d / num_loci as f64 } else { sum_d }
+    if normalize && num_loci > 0 {
+        sum_d / num_loci as f64
+    } else {
+        sum_d
+    }
 }

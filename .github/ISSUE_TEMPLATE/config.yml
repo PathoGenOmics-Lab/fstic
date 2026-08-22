@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question about using Fstic
+    url: https://github.com/PathoGenOmics-Lab/fstic/discussions/new?category=q-a
+    about: >
+      How to choose an estimator, how to read a matrix, what a warning means.
+      Discussions rather than issues, so the answers stay findable.
+  - name: Documentation
+    url: https://pathogenomics-lab.github.io/fstic/
+    about: >
+      The tutorial, the estimator guide, the filter reference and the model the
+      estimators rest on.
+  - name: A study that used Fstic
+    url: https://github.com/PathoGenOmics-Lab/fstic/discussions/new?category=studies-using-fstic
+    about: Tell us about it, so others can see how it is being used.

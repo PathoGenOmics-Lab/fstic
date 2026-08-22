@@ -15,8 +15,14 @@ fn write_vcf(dir: &Path, name: &str, lines: &[&str]) {
 /// instead of a substring is the difference between a real check and one that the
 /// zero on the diagonal satisfies by accident.
 fn off_diagonal(content: &str, sep: char) -> f64 {
-    let line = content.lines().nth(1).expect("matrix needs a first data row");
-    let cell = line.split(sep).nth(2).expect("matrix needs a second column");
+    let line = content
+        .lines()
+        .nth(1)
+        .expect("matrix needs a first data row");
+    let cell = line
+        .split(sep)
+        .nth(2)
+        .expect("matrix needs a second column");
     cell.trim()
         .parse()
         .unwrap_or_else(|_| panic!("cell {:?} is not a number", cell))
@@ -26,19 +32,28 @@ fn off_diagonal(content: &str, sep: char) -> f64 {
 #[test]
 fn identical_samples_zero_distance() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "sampleA", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50.0%",
-        "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30.0%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "sampleA",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50.0%",
+            "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30.0%",
+        ],
+    );
 
-    write_vcf(dir.path(), "sampleB", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50.0%",
-        "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30.0%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "sampleB",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50.0%",
+            "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30.0%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
 
@@ -49,11 +64,16 @@ fn identical_samples_zero_distance() {
             dir.path().join("sampleB.vcf").to_str().unwrap(),
             "-o",
             out.to_str().unwrap(),
-            "--formula", "fst",
-            "--min-depth", "1",
-            "--min-af", "0.01",
-            "--min-alt-reads", "1",
-            "--min-alt-rev-reads", "0",
+            "--formula",
+            "fst",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -69,17 +89,26 @@ fn identical_samples_zero_distance() {
 #[test]
 fn different_samples_positive_fst() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "pop1", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:90:90.0%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "pop1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:90:90.0%",
+        ],
+    );
 
-    write_vcf(dir.path(), "pop2", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:10:10.0%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "pop2",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:10:10.0%",
+        ],
+    );
 
     let out = dir.path().join("out.tsv");
     let status = fstic_bin()
@@ -89,11 +118,16 @@ fn different_samples_positive_fst() {
             dir.path().join("pop2.vcf").to_str().unwrap(),
             "-o",
             out.to_str().unwrap(),
-            "--formula", "fst",
-            "--min-depth", "1",
-            "--min-af", "0.01",
-            "--min-alt-reads", "1",
-            "--min-alt-rev-reads", "0",
+            "--formula",
+            "fst",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -113,18 +147,27 @@ fn different_samples_positive_fst() {
 #[test]
 fn freq_as_proportion() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
     // 0.5 = 50%, NOT 0.5%
-    write_vcf(dir.path(), "propA", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:0.5",
-    ]);
+    write_vcf(
+        dir.path(),
+        "propA",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:0.5",
+        ],
+    );
 
-    write_vcf(dir.path(), "propB", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "propB",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let status = fstic_bin()
@@ -134,11 +177,16 @@ fn freq_as_proportion() {
             dir.path().join("propB.vcf").to_str().unwrap(),
             "-o",
             out.to_str().unwrap(),
-            "--formula", "fst",
-            "--min-depth", "1",
-            "--min-af", "0.01",
-            "--min-alt-reads", "1",
-            "--min-alt-rev-reads", "0",
+            "--formula",
+            "fst",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -149,23 +197,36 @@ fn freq_as_proportion() {
     let lines: Vec<&str> = content.lines().collect();
     let vals: Vec<&str> = lines[1].split(',').collect();
     let dist: f64 = vals[2].parse().unwrap();
-    assert!(dist.abs() < 1e-6, "Same freq (0.5 vs 50%) should give 0 distance, got {}", dist);
+    assert!(
+        dist.abs() < 1e-6,
+        "Same freq (0.5 vs 50%) should give 0 distance, got {}",
+        dist
+    );
 }
 
 /// VCF mode should NOT require --reference.
 #[test]
 fn vcf_no_reference_required() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
-    ]);
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     // No --reference flag
@@ -174,11 +235,16 @@ fn vcf_no_reference_required() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1",
-            "--min-af", "0.01",
-            "--min-alt-reads", "1",
-            "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -190,17 +256,26 @@ fn vcf_no_reference_required() {
 #[test]
 fn indels_skipped() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
     // Only indels, no SNPs → should fail with "no polymorphic sites"
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tAT\tA\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
-    ]);
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t100\t.\tAT\tA\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tAT\tA\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[
+            header,
+            "chr1\t100\t.\tAT\tA\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let status = fstic_bin()
@@ -208,9 +283,16 @@ fn indels_skipped() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -223,18 +305,27 @@ fn indels_skipped() {
 #[test]
 fn non_variant_and_star_skipped() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tA\t.\t.\t.\t.\tGT:DP:AD:FREQ\t0/0:100:0:0%",  // no-variant
-        "chr1\t200\t.\tA\t*\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%", // upstream del
-        "chr1\t300\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%", // real SNP
-    ]);
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t300\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tA\t.\t.\t.\t.\tGT:DP:AD:FREQ\t0/0:100:0:0%", // no-variant
+            "chr1\t200\t.\tA\t*\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%", // upstream del
+            "chr1\t300\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%", // real SNP
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[
+            header,
+            "chr1\t300\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:30:30%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let res = fstic_bin()
@@ -242,10 +333,18 @@ fn non_variant_and_star_skipped() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--formula", "bray-curtis",
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--formula",
+            "bray-curtis",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .output()
         .unwrap();
@@ -257,7 +356,11 @@ fn non_variant_and_star_skipped() {
     assert!(err.contains("1 polymorphic sites"), "got: {}", err);
     // 0.5 against 0.3 over one locus
     let content = fs::read_to_string(&out).unwrap();
-    assert!((off_diagonal(&content, ',') - 0.2).abs() < 1e-12, "matrix was:\n{}", content);
+    assert!(
+        (off_diagonal(&content, ',') - 0.2).abs() < 1e-12,
+        "matrix was:\n{}",
+        content
+    );
 }
 
 /// Nei and Reynolds return infinity for a fixed difference, which has to reach the
@@ -265,10 +368,25 @@ fn non_variant_and_star_skipped() {
 #[test]
 fn non_finite_distance_is_written_as_na() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "fixA", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t1/1:100:100%"]);
-    write_vcf(dir.path(), "fixB", &[header, "chr1\t100\t.\tA\tG\t.\t.\t.\tGT:DP:FREQ\t1/1:100:100%"]);
+    write_vcf(
+        dir.path(),
+        "fixA",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t1/1:100:100%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "fixB",
+        &[
+            header,
+            "chr1\t100\t.\tA\tG\t.\t.\t.\tGT:DP:FREQ\t1/1:100:100%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let status = fstic_bin()
@@ -276,10 +394,18 @@ fn non_finite_distance_is_written_as_na() {
             "--vcf",
             dir.path().join("fixA.vcf").to_str().unwrap(),
             dir.path().join("fixB.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--formula", "nei",
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--formula",
+            "nei",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -295,10 +421,25 @@ fn non_finite_distance_is_written_as_na() {
 #[test]
 fn sample_names_containing_the_separator_are_quoted() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "with,comma", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
-    write_vcf(dir.path(), "plain", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%"]);
+    write_vcf(
+        dir.path(),
+        "with,comma",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "plain",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let status = fstic_bin()
@@ -306,16 +447,27 @@ fn sample_names_containing_the_separator_are_quoted() {
             "--vcf",
             dir.path().join("with,comma.vcf").to_str().unwrap(),
             dir.path().join("plain.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
 
     assert!(status.success());
     let content = fs::read_to_string(&out).unwrap();
-    assert!(content.contains("\"with,comma\""), "name was not quoted:\n{}", content);
+    assert!(
+        content.contains("\"with,comma\""),
+        "name was not quoted:\n{}",
+        content
+    );
     // Header plus two rows, each with 3 fields once quoting is honoured
     for line in content.lines() {
         let fields = line.matches(',').count() - line.matches("\"with,comma\"").count();
@@ -332,18 +484,27 @@ fn sample_names_containing_the_separator_are_quoted() {
 #[test]
 fn freq_from_ad_dp() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
     // AD=20,80 means 80 alt reads out of 100, i.e. 0.8
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:20,80",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:100:20,80",
+        ],
+    );
     // Same frequency, stated outright
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:80%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:80%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let status = fstic_bin()
@@ -351,10 +512,18 @@ fn freq_from_ad_dp() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--formula", "bray-curtis",
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--formula",
+            "bray-curtis",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -377,13 +546,20 @@ fn run_table(dir: &Path, body: &str, extra: &[&str]) -> (std::process::Output, s
     let reference = write_ref(dir);
     let out = dir.join("out.csv");
     let mut args: Vec<String> = vec![
-        "--table".into(), table.to_str().unwrap().into(),
-        "-r".into(), reference.to_str().unwrap().into(),
-        "-o".into(), out.to_str().unwrap().into(),
-        "--min-depth".into(), "1".into(),
-        "--min-af".into(), "0.01".into(),
-        "--min-alt-reads".into(), "1".into(),
-        "--min-alt-rev-reads".into(), "0".into(),
+        "--table".into(),
+        table.to_str().unwrap().into(),
+        "-r".into(),
+        reference.to_str().unwrap().into(),
+        "-o".into(),
+        out.to_str().unwrap().into(),
+        "--min-depth".into(),
+        "1".into(),
+        "--min-af".into(),
+        "0.01".into(),
+        "--min-alt-reads".into(),
+        "1".into(),
+        "--min-alt-rev-reads".into(),
+        "0".into(),
     ];
     args.extend(extra.iter().map(|s| s.to_string()));
     (fstic_bin().args(&args).output().unwrap(), out)
@@ -393,9 +569,24 @@ fn run_table(dir: &Path, body: &str, extra: &[&str]) -> (std::process::Output, s
 #[test]
 fn table_matches_vcf_on_equivalent_data() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
-    write_vcf(dir.path(), "sA", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:50%"]);
-    write_vcf(dir.path(), "sB", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:80%"]);
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    write_vcf(
+        dir.path(),
+        "sA",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:50%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "sB",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:80%",
+        ],
+    );
 
     let vcf_out = dir.path().join("vcf.csv");
     let status = fstic_bin()
@@ -403,10 +594,18 @@ fn table_matches_vcf_on_equivalent_data() {
             "--vcf",
             dir.path().join("sA.vcf").to_str().unwrap(),
             dir.path().join("sB.vcf").to_str().unwrap(),
-            "-o", vcf_out.to_str().unwrap(),
-            "--formula", "chord",
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            vcf_out.to_str().unwrap(),
+            "--formula",
+            "chord",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -419,11 +618,20 @@ fn table_matches_vcf_on_equivalent_data() {
          sB,chr1,100,A,T,0.8\n",
         &["--formula", "chord"],
     );
-    assert!(res.status.success(), "{}", String::from_utf8_lossy(&res.stderr));
+    assert!(
+        res.status.success(),
+        "{}",
+        String::from_utf8_lossy(&res.stderr)
+    );
 
     let from_vcf = off_diagonal(&fs::read_to_string(&vcf_out).unwrap(), ',');
     let from_table = off_diagonal(&fs::read_to_string(&table_out).unwrap(), ',');
-    assert!((from_vcf - from_table).abs() < 1e-12, "{} vs {}", from_vcf, from_table);
+    assert!(
+        (from_vcf - from_table).abs() < 1e-12,
+        "{} vs {}",
+        from_vcf,
+        from_table
+    );
 }
 
 /// The README promises case-insensitive column names.
@@ -437,7 +645,11 @@ fn table_headers_are_case_insensitive() {
          sB,100,A,T,0.8\n",
         &["--formula", "bray-curtis"],
     );
-    assert!(res.status.success(), "{}", String::from_utf8_lossy(&res.stderr));
+    assert!(
+        res.status.success(),
+        "{}",
+        String::from_utf8_lossy(&res.stderr)
+    );
     assert!((off_diagonal(&fs::read_to_string(&out).unwrap(), ',') - 0.3).abs() < 1e-12);
 }
 
@@ -452,7 +664,11 @@ fn table_accepts_percentage_frequencies() {
          sB,100,A,T,80%\n",
         &["--formula", "bray-curtis"],
     );
-    assert!(res.status.success(), "{}", String::from_utf8_lossy(&res.stderr));
+    assert!(
+        res.status.success(),
+        "{}",
+        String::from_utf8_lossy(&res.stderr)
+    );
     assert!((off_diagonal(&fs::read_to_string(&out).unwrap(), ',') - 0.3).abs() < 1e-12);
 }
 
@@ -482,17 +698,35 @@ fn table_mixed_chrom_column_is_rejected() {
     let reference = write_ref(dir.path());
     let a = dir.path().join("a.csv");
     let b = dir.path().join("b.csv");
-    fs::write(&a, "sample,chrom,position,ref_allele,sequence,frequency\nsA,chr1,100,A,T,0.5\n").unwrap();
-    fs::write(&b, "sample,position,ref_allele,sequence,frequency\nsB,100,A,T,0.8\n").unwrap();
+    fs::write(
+        &a,
+        "sample,chrom,position,ref_allele,sequence,frequency\nsA,chr1,100,A,T,0.5\n",
+    )
+    .unwrap();
+    fs::write(
+        &b,
+        "sample,position,ref_allele,sequence,frequency\nsB,100,A,T,0.8\n",
+    )
+    .unwrap();
 
     let out = dir.path().join("out.csv");
     let res = fstic_bin()
         .args([
-            "--table", a.to_str().unwrap(), b.to_str().unwrap(),
-            "-r", reference.to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "--table",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "-r",
+            reference.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .output()
         .unwrap();
@@ -507,11 +741,33 @@ fn table_mixed_chrom_column_is_rejected() {
 #[test]
 fn sample_with_no_surviving_variants_keeps_its_row() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "keep1", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
-    write_vcf(dir.path(), "keep2", &[header, "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
-    write_vcf(dir.path(), "quiet", &[header, "chr1\t300\t.\tT\tC\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%"]);
+    write_vcf(
+        dir.path(),
+        "keep1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "keep2",
+        &[
+            header,
+            "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "quiet",
+        &[
+            header,
+            "chr1\t300\t.\tT\tC\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let res = fstic_bin()
@@ -520,20 +776,41 @@ fn sample_with_no_surviving_variants_keeps_its_row() {
             dir.path().join("keep1.vcf").to_str().unwrap(),
             dir.path().join("keep2.vcf").to_str().unwrap(),
             dir.path().join("quiet.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--formula", "bray-curtis",
-            "--min-depth", "1", "--min-af", "0.5",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--formula",
+            "bray-curtis",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.5",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .output()
         .unwrap();
 
     assert!(res.status.success());
     let content = fs::read_to_string(&out).unwrap();
-    assert_eq!(content.lines().count(), 4, "3 samples plus header:\n{}", content);
-    assert!(content.lines().any(|l| l.starts_with("quiet,")), "missing row:\n{}", content);
+    assert_eq!(
+        content.lines().count(),
+        4,
+        "3 samples plus header:\n{}",
+        content
+    );
+    assert!(
+        content.lines().any(|l| l.starts_with("quiet,")),
+        "missing row:\n{}",
+        content
+    );
     let err = String::from_utf8_lossy(&res.stderr);
-    assert!(err.contains("no variants left after filtering"), "got: {}", err);
+    assert!(
+        err.contains("no variants left after filtering"),
+        "got: {}",
+        err
+    );
 }
 
 /// Sample names come from the file stem, so equal basenames would silently merge
@@ -541,13 +818,28 @@ fn sample_with_no_surviving_variants_keeps_its_row() {
 #[test]
 fn duplicate_sample_names_are_rejected() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
     let (a, b) = (dir.path().join("a"), dir.path().join("b"));
     fs::create_dir_all(&a).unwrap();
     fs::create_dir_all(&b).unwrap();
 
-    write_vcf(&a, "s", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%"]);
-    write_vcf(&b, "s", &[header, "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%"]);
+    write_vcf(
+        &a,
+        "s",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:90%",
+        ],
+    );
+    write_vcf(
+        &b,
+        "s",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:10%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let res = fstic_bin()
@@ -555,9 +847,16 @@ fn duplicate_sample_names_are_rejected() {
             "--vcf",
             a.join("s.vcf").to_str().unwrap(),
             b.join("s.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .output()
         .unwrap();
@@ -572,17 +871,23 @@ fn duplicate_sample_names_are_rejected() {
 #[test]
 fn freq_above_one_from_ad_dp_is_dropped() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:10:15",   // AD > DP, unusable
-        "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD\t0/1:100:50",  // fine
-    ]);
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD\t0/1:100:50",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD\t0/1:10:15", // AD > DP, unusable
+            "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD\t0/1:100:50", // fine
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[header, "chr1\t200\t.\tC\tG\t.\t.\t.\tGT:DP:AD\t0/1:100:50"],
+    );
 
     let out = dir.path().join("out.csv");
     let res = fstic_bin()
@@ -590,16 +895,27 @@ fn freq_above_one_from_ad_dp_is_dropped() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .output()
         .unwrap();
 
     assert!(res.status.success());
     let err = String::from_utf8_lossy(&res.stderr);
-    assert!(err.contains("outside [0,1]"), "the drop must be reported, got: {}", err);
+    assert!(
+        err.contains("outside [0,1]"),
+        "the drop must be reported, got: {}",
+        err
+    );
     // Only chr1:200 survives, and both samples agree there
     assert!(err.contains("1 polymorphic sites"), "got: {}", err);
     assert_eq!(off_diagonal(&fs::read_to_string(&out).unwrap(), ','), 0.0);
@@ -609,16 +925,25 @@ fn freq_above_one_from_ad_dp_is_dropped() {
 #[test]
 fn unparseable_ad_is_reported() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:.,.:90%",
-    ]);
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:90,10:10%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:.,.:90%",
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\t.\t.\tGT:DP:AD:FREQ\t0/1:100:90,10:10%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let res = fstic_bin()
@@ -626,9 +951,16 @@ fn unparseable_ad_is_reported() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "50", "--min-alt-rev-reads", "0",
+            "-o",
+            out.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "50",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .output()
         .unwrap();
@@ -646,7 +978,8 @@ fn unparseable_ad_is_reported() {
 #[test]
 fn output_is_independent_of_worker_count() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
     // Enough loci, at irregular frequencies, for the summation order to show up.
     let mut a = vec![header.to_string()];
@@ -654,8 +987,14 @@ fn output_is_independent_of_worker_count() {
     for pos in 1..4000 {
         let fa = 3.0 + (pos as f64 * 7.3) % 91.0;
         let fb = 2.0 + (pos as f64 * 11.7) % 93.0;
-        a.push(format!("chr1\t{}\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:{:.6}%", pos, fa));
-        b.push(format!("chr1\t{}\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:{:.6}%", pos, fb));
+        a.push(format!(
+            "chr1\t{}\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:{:.6}%",
+            pos, fa
+        ));
+        b.push(format!(
+            "chr1\t{}\t.\tA\tT\t.\t.\t.\tGT:DP:FREQ\t0/1:100:{:.6}%",
+            pos, fb
+        ));
     }
     let a_ref: Vec<&str> = a.iter().map(|s| s.as_str()).collect();
     let b_ref: Vec<&str> = b.iter().map(|s| s.as_str()).collect();
@@ -669,11 +1008,20 @@ fn output_is_independent_of_worker_count() {
                 "--vcf",
                 dir.path().join("wa.vcf").to_str().unwrap(),
                 dir.path().join("wb.vcf").to_str().unwrap(),
-                "-o", out.to_str().unwrap(),
-                "--formula", "fst",
-                "--workers", workers,
-                "--min-depth", "1", "--min-af", "0.01",
-                "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+                "-o",
+                out.to_str().unwrap(),
+                "--formula",
+                "fst",
+                "--workers",
+                workers,
+                "--min-depth",
+                "1",
+                "--min-af",
+                "0.01",
+                "--min-alt-reads",
+                "1",
+                "--min-alt-rev-reads",
+                "0",
             ])
             .status()
             .unwrap();
@@ -683,7 +1031,12 @@ fn output_is_independent_of_worker_count() {
 
     let one = run("1", "w1.csv");
     for (workers, name) in [("2", "w2.csv"), ("3", "w3.csv"), ("8", "w8.csv")] {
-        assert_eq!(one, run(workers, name), "--workers {} changed the output", workers);
+        assert_eq!(
+            one,
+            run(workers, name),
+            "--workers {} changed the output",
+            workers
+        );
     }
 }
 
@@ -691,18 +1044,27 @@ fn output_is_independent_of_worker_count() {
 #[test]
 fn pass_only_filter() {
     let dir = tempfile::tempdir().unwrap();
-    let header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+    let header =
+        "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
 
-    write_vcf(dir.path(), "s1", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\tLowQual\t.\tGT:DP:AD:FREQ\t0/1:100:90:90%",  // filtered
-        "chr1\t200\t.\tC\tG\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",     // pass
-    ]);
-    write_vcf(dir.path(), "s2", &[
-        header,
-        "chr1\t100\t.\tA\tT\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:10:10%",
-        "chr1\t200\t.\tC\tG\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
-    ]);
+    write_vcf(
+        dir.path(),
+        "s1",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\tLowQual\t.\tGT:DP:AD:FREQ\t0/1:100:90:90%", // filtered
+            "chr1\t200\t.\tC\tG\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",    // pass
+        ],
+    );
+    write_vcf(
+        dir.path(),
+        "s2",
+        &[
+            header,
+            "chr1\t100\t.\tA\tT\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:10:10%",
+            "chr1\t200\t.\tC\tG\t.\tPASS\t.\tGT:DP:AD:FREQ\t0/1:100:50:50%",
+        ],
+    );
 
     let out = dir.path().join("out.csv");
     let status = fstic_bin()
@@ -710,10 +1072,17 @@ fn pass_only_filter() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
             "--pass-only",
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -727,9 +1096,16 @@ fn pass_only_filter() {
             "--vcf",
             dir.path().join("s1.vcf").to_str().unwrap(),
             dir.path().join("s2.vcf").to_str().unwrap(),
-            "-o", out_no_filter.to_str().unwrap(),
-            "--min-depth", "1", "--min-af", "0.01",
-            "--min-alt-reads", "1", "--min-alt-rev-reads", "0",
+            "-o",
+            out_no_filter.to_str().unwrap(),
+            "--min-depth",
+            "1",
+            "--min-af",
+            "0.01",
+            "--min-alt-reads",
+            "1",
+            "--min-alt-rev-reads",
+            "0",
         ])
         .status()
         .unwrap();
@@ -745,5 +1121,10 @@ fn pass_only_filter() {
     };
     let d_filt = get_dist(&content_filt);
     let d_nofilt = get_dist(&content_nofilt);
-    assert!(d_filt < d_nofilt, "--pass-only should reduce distance (filtered {} vs unfiltered {})", d_filt, d_nofilt);
+    assert!(
+        d_filt < d_nofilt,
+        "--pass-only should reduce distance (filtered {} vs unfiltered {})",
+        d_filt,
+        d_nofilt
+    );
 }

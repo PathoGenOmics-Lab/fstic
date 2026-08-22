@@ -10,15 +10,20 @@ pub fn calculate_rogers_distance_for_pair(
     all_positions: &[GenomicPos],
     num_loci: usize,
 ) -> f64 {
-    if num_loci == 0 { return 0.0; }
+    if num_loci == 0 {
+        return 0.0;
+    }
 
     let total_sum_sq = sum_per_locus(all_positions, |pos| {
         let psf = get_all_freqs_at_pos(data1.get(pos), data2.get(pos));
-        psf.all_alleles.iter().map(|a| {
-            let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
-            let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
-            (p - q).powi(2)
-        }).sum::<f64>()
+        psf.all_alleles
+            .iter()
+            .map(|a| {
+                let p = psf.freqs1.get(a).copied().unwrap_or(0.0);
+                let q = psf.freqs2.get(a).copied().unwrap_or(0.0);
+                (p - q).powi(2)
+            })
+            .sum::<f64>()
     });
 
     (total_sum_sq / (2.0 * num_loci as f64)).sqrt()

@@ -1,0 +1,81 @@
+# Dependency updates.
+#
+# Grouped and monthly rather than one pull request per dependency as they land.
+# The shape matters more than the frequency: a routine bump that survives the
+# suite has been examined more carefully than anyone would examine it by eye,
+# while a major changes APIs and wants a person. Keeping those apart is what
+# lets the first kind merge itself without the second riding along.
+#
+# The minor and patch groups merge automatically once CI passes; see
+# .github/workflows/dependabot-auto-merge.yml. The major groups never do.
+#
+# `schedule` here is Dependabot's own timer, not a cron in GitHub Actions. The
+# only workflow in this repository that runs on a schedule is the issue sweep.
+#
+# Security updates are a separate mechanism, enabled in the repository settings
+# and unaffected by any of this: a vulnerable dependency still gets its own pull
+# request the day the advisory lands, major or not.
+
+version: 2
+
+updates:
+  # The crate itself.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels: ["dependencies", "rust"]
+    commit-message:
+      prefix: "cargo"
+    groups:
+      cargo-routine:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      cargo-major:
+        patterns: ["*"]
+        update-types: ["major"]
+
+  # The documentation site's build dependencies. They live in docs/ rather than
+  # at the root so that Dependabot finds them next to what they build.
+  - package-ecosystem: pip
+    directory: "/docs"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    labels: ["dependencies", "documentation"]
+    commit-message:
+      prefix: "docs"
+    groups:
+      docs-routine:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      docs-major:
+        patterns: ["*"]
+        update-types: ["major"]
+
+  # The actions the workflows pin. These go stale silently: a deprecated runner
+  # image or a Node version dropped from an action is only noticed when a job
+  # starts warning, or fails.
+  #
+  # One exception is configured below rather than left to be discovered. The
+  # minimum supported Rust version is checked by passing `toolchain:` as an
+  # input to dtolnay/rust-toolchain, not by pinning the action to
+  # `rust-toolchain@1.82`. Written the second way, Dependabot reads the version
+  # as an action ref and helpfully bumps it, and the job then goes on passing
+  # while verifying a compiler that is no longer the floor.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    labels: ["dependencies", "github-actions"]
+    commit-message:
+      prefix: "actions"
+    groups:
+      actions-routine:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      actions-major:
+        patterns: ["*"]
+        update-types: ["major"]

@@ -17,14 +17,14 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - "CHANGELOG.md"
-      - "requirements-docs.txt"
+      - "docs/requirements.txt"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "docs/**"
       - "mkdocs.yml"
       - "CHANGELOG.md"
-      - "requirements-docs.txt"
+      - "docs/requirements.txt"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -47,7 +47,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install dependencies
-        run: pip install -r requirements-docs.txt
+        run: pip install -r docs/requirements.txt
 
       # --strict turns broken internal links and missing nav entries into
       # errors, so a pull request that breaks one fails here instead of
@@ -78,7 +78,7 @@ jobs:
             mkdocs-material-
 
       - name: Install dependencies
-        run: pip install -r requirements-docs.txt
+        run: pip install -r docs/requirements.txt
 
       - name: Build and deploy
         run: mkdocs gh-deploy --force --strict

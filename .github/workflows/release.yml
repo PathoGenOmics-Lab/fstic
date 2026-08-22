@@ -1,0 +1,340 @@
+name: Build & Release
+
+# Cut a release by pushing a tag. Everything below hangs off that: the binaries,
+# the checksums, the provenance, the crates.io publish and the notes. Nothing
+# here needs a person to remember a step, which is the point: bioconda and
+# Zenodo fall behind precisely because publishing is a thing someone does by
+# hand afterwards.
+#
+# The release is created as a draft and published at the end, so a matrix that
+# fails halfway leaves an unpublished draft rather than a release carrying
+# binaries for two platforms out of four.
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset_suffix }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-15
+            rust_target: aarch64-apple-darwin
+            asset_suffix: macos-aarch64
+          - platform: macos-15
+            rust_target: x86_64-apple-darwin
+            asset_suffix: macos-x86_64
+          - platform: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+            asset_suffix: linux-x86_64
+          - platform: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            asset_suffix: windows-x86_64
+
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.rust_target }}
+
+      # ubuntu-22.04 rather than latest, deliberately. The binary links against
+      # the runner's glibc, and building on a newer image raises the minimum
+      # glibc every user needs without anything saying so. Cluster nodes are
+      # routinely older than the newest runner image.
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.rust_target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/fstic_${{ github.ref_name }}_${{ matrix.asset_suffix }}"
+          mkdir -p "$package_dir"
+          cp "target/${{ matrix.rust_target }}/release/fstic" "$package_dir/fstic"
+          cp README.md CHANGELOG.md LICENSE "$package_dir/"
+          tar -C dist -czf "${package_dir}.tar.gz" "$(basename "$package_dir")"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packageDir = "dist/fstic_${{ github.ref_name }}_${{ matrix.asset_suffix }}"
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          Copy-Item "target/${{ matrix.rust_target }}/release/fstic.exe" "$packageDir/fstic.exe"
+          Copy-Item README.md, CHANGELOG.md, LICENSE -Destination $packageDir
+          Compress-Archive -Path $packageDir -DestinationPath "$packageDir.zip" -Force
+
+      # The binary is built here and run nowhere. A cross-compiled or
+      # mis-packaged archive would be found by whoever downloaded it. This
+      # unpacks what is about to be uploaded and runs it, on the runners where
+      # that is possible at all.
+      - name: The packaged binary runs and reports the tagged version
+        if: matrix.rust_target != 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          case "${{ runner.os }}" in
+            Windows) unzip -q "fstic_${{ github.ref_name }}_${{ matrix.asset_suffix }}.zip" -d check
+                     binary="check/fstic_${{ github.ref_name }}_${{ matrix.asset_suffix }}/fstic.exe" ;;
+            *)       tar -xzf "fstic_${{ github.ref_name }}_${{ matrix.asset_suffix }}.tar.gz" -C .
+                     binary="fstic_${{ github.ref_name }}_${{ matrix.asset_suffix }}/fstic" ;;
+          esac
+          reported=$("$binary" --version)
+          echo "$reported"
+          expected="fstic ${GITHUB_REF_NAME#v}"
+          if [ "$reported" != "$expected" ]; then
+            echo "packaged binary says '$reported', tag says '$expected'" >&2
+            exit 1
+          fi
+
+      - name: Upload to the draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "fstic ${{ github.ref_name }}"
+          draft: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          # No notes here. The finalize job writes them once, from the tag, and
+          # overwrites whatever created the draft put in.
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+
+  # crates.io, from the tag, so it cannot fall behind.
+  #
+  # It waits for the whole matrix. If a platform failed, this is not a release,
+  # and a crates.io version is permanent: `cargo yank` hides it from resolution
+  # and nothing ever deletes it. That asymmetry is why this refuses more readily
+  # than the other jobs.
+  #
+  # Needs CARGO_REGISTRY_TOKEN in the repository secrets. Without one the job
+  # says so and stops, rather than failing with an authentication error that
+  # reads like a broken workflow.
+  crates:
+    name: Publish to crates.io
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check there is a token to publish with
+        env:
+          TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN}" ]; then
+            echo "No CARGO_REGISTRY_TOKEN is set, so this release is not going to crates.io." >&2
+            echo "Add one under Settings -> Secrets and variables -> Actions to turn this on." >&2
+            exit 1
+          fi
+
+      # The version in Cargo.toml and the tag are one fact written twice, and
+      # crates.io cannot be corrected afterwards: publishing 1.0.1 under a tag
+      # that says 1.0.2 is permanent. Compared here rather than trusted.
+      - name: The tag and Cargo.toml agree on the version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          manifest=$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['packages'][0]['version'])")
+          if [ "${TAG#v}" != "$manifest" ]; then
+            echo "tag says ${TAG#v} and Cargo.toml says $manifest; refusing to publish" >&2
+            exit 1
+          fi
+          echo "both say $manifest"
+
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked
+
+  # Everything above uploads binaries and nothing says what they should contain.
+  # Someone who downloads an archive has no way to tell a good download from a
+  # truncated one, and no way to tell either from a substituted one. This
+  # publishes one SHA256SUMS covering every asset, in the format `sha256sum -c`
+  # reads, then signs a statement about where those bytes came from, then
+  # publishes the release.
+  #
+  # It waits on the whole matrix, so the file covers all four platforms or is
+  # not written at all: a checksums file that silently covered three out of four
+  # would be worse than none.
+  finalize:
+    name: Publish checksums, provenance and the release notes
+    needs: [build, crates]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      # Provenance is signed with the workflow's own short-lived identity, which
+      # is what makes the attestation say something a person could not forge by
+      # uploading a file.
+      id-token: write
+      attestations: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checksum every asset on the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          # The release is still a draft here. Draft assets are downloadable by
+          # an authenticated token, which is what makes this possible before the
+          # release is published.
+          gh release download "$TAG" --repo "$REPO" --dir release-assets --pattern '*' --clobber
+
+          # On a rerun the previous SHA256SUMS is itself an asset, and would be
+          # checksummed into its own successor.
+          rm -f release-assets/SHA256SUMS
+
+          count=$(find release-assets -maxdepth 1 -type f | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "the release carries no assets: refusing to publish an empty checksums file" >&2
+            exit 1
+          fi
+
+          # LC_ALL=C so the order does not depend on the runner's locale, and
+          # `--` so a name beginning with a dash stays a name.
+          (cd release-assets && LC_ALL=C sha256sum -- * > ../SHA256SUMS)
+
+          # Read it back and check it against the bytes on disk, rather than
+          # trusting that writing it worked.
+          (cd release-assets && sha256sum -c ../SHA256SUMS)
+
+          echo "checksummed $count assets"
+          cat SHA256SUMS
+          gh release upload "$TAG" SHA256SUMS --repo "$REPO" --clobber
+
+      # The checksums say a download arrived intact. They cannot say where it
+      # came from: a checksums file and the file it describes can both be
+      # replaced by whoever can write to the release. This signs a statement,
+      # with the workflow's own short-lived identity rather than a stored key,
+      # that these exact bytes were built by this workflow from this commit.
+      - name: Attest that these binaries came from this commit
+        uses: actions/attest-build-provenance@v2
+        with:
+          # The same set the checksums cover: the step above leaves them in
+          # release-assets/, with the previous SHA256SUMS already removed.
+          subject-path: "release-assets/*"
+
+      # The notes say only what is true of any release and derive the rest from
+      # the tag, so there is nothing to keep in step by hand. A paragraph typed
+      # in here would outlive its release and describe every later one wrongly.
+      - name: Write the release notes and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+
+          # Cutting a release with nothing written about it in the changelog is
+          # a mistake rather than a decision, and the notes below link to that
+          # entry. Fail here, where the draft is still unpublished and the entry
+          # can be added, rather than link a reader to a version the changelog
+          # never mentions.
+          if ! grep -q "^## \[${version}\]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no '## [${version}]' entry: refusing to announce a release the changelog does not describe" >&2
+            exit 1
+          fi
+
+          # Quoted heredoc: the body is written literally, backticks and all,
+          # and the placeholders are filled afterwards. An unquoted one would
+          # run the fenced commands instead of printing them.
+          cat > NOTES.template <<'MARKDOWN'
+          ## fstic @TAG@
+
+          Everything that changed in this version is listed in the
+          [changelog](https://github.com/@REPO@/blob/@TAG@/CHANGELOG.md), pinned to
+          this release. Full documentation lives at
+          <https://pathogenomics-lab.github.io/fstic/>, and the
+          [tutorial](https://pathogenomics-lab.github.io/fstic/tutorial/) runs four
+          samples from raw VCFs to a tree.
+
+          ### Install
+
+          ```bash
+          conda install -c bioconda fstic
+          ```
+
+          Or take an archive below: each holds the `fstic` binary for one
+          platform, with the README, the changelog and the licence.
+
+          ### Check what you downloaded
+
+          `SHA256SUMS` covers every asset in this release. Download it next to
+          the file you took and check the two together:
+
+          ```bash
+          sha256sum --ignore-missing -c SHA256SUMS
+          ```
+
+          Each file it finds prints `OK`. On macOS, `shasum -a 256
+          --ignore-missing -c SHA256SUMS` does the same.
+
+          ### Check where it came from
+
+          That tells you the download arrived intact. This tells you what it is:
+
+          ```bash
+          gh attestation verify <the file you downloaded> --repo @REPO@
+          ```
+
+          Every binary here is signed with a statement that this workflow built
+          it from this repository, at the commit this release was cut from. It
+          needs no key of ours and no trust in this page.
+          MARKDOWN
+
+          # YAML strips the block's own indentation, so the heredoc arrives at
+          # column zero. Plain `sed` into a second file rather than `sed -i`,
+          # whose spelling differs between GNU and BSD: this way the step can be
+          # run and checked on a laptop, not only on the runner.
+          sed "s|@TAG@|${TAG}|g; s|@REPO@|${REPO}|g" NOTES.template > NOTES.md
+
+          if grep -q '@TAG@\|@REPO@' NOTES.md; then
+            echo "a placeholder survived into the notes" >&2
+            exit 1
+          fi
+
+          echo "--- notes ---"; cat NOTES.md; echo "-------------"
+
+          # Overwrites whatever created the draft put there, so there is one
+          # source for the notes and not two, and publishes it: everything that
+          # had to succeed has succeeded by this point.
+          gh release edit "$TAG" --repo "$REPO" \
+            --notes-file NOTES.md \
+            --draft=false

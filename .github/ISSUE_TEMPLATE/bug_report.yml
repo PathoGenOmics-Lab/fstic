@@ -1,0 +1,87 @@
+name: Bug report
+description: A wrong number, a crash, or something that does not do what the docs say
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The two things that make a report actionable are
+        the exact command and the stderr output: Fstic counts everything it
+        drops and prints it before the summary, so that block usually says what
+        happened.
+
+        For a wrong number, say what you expected and why. Several of the
+        estimators have variants that differ in ways easy to mistake for a bug
+        in either direction, so the reasoning matters as much as the value.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `fstic --version`
+      placeholder: fstic 1.0.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Bioconda
+        - Built from source with cargo
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: The command you ran
+      render: shell
+      placeholder: fstic --vcf sample*.vcf --output d.csv --formula gst --min-depth 50
+    validations:
+      required: true
+
+  - type: textarea
+    id: stderr
+    attributes:
+      label: What it printed
+      description: >
+        The whole stderr block, including the filter echo at the top, any
+        warnings, and the summary. Capture it with `2> run.log` if it is long.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: For a wrong number, the value you expected and where it comes from.
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      description: >
+        A couple of small VCFs or a few table rows that show the problem, if you
+        can share them. A synthetic file that reproduces it is worth more than a
+        description of a real one you cannot attach. Please do not paste
+        identifiable sample data.
+      render: text
+
+  - type: dropdown
+    id: formula
+    attributes:
+      label: Which estimator
+      multiple: true
+      options: [fst, gst, nei, chord, bray-curtis, jost_d, reynolds, rogers, "not estimator-specific"]
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: Ubuntu 24.04 / macOS 15 arm64 / Windows 11

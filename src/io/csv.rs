@@ -18,7 +18,11 @@ pub fn read_csv_files(
     let mut all_rows: Vec<TableInputRow> = Vec::new();
     for f in per_file {
         if let Some(err) = f.open_error {
-            return Err(format!("Cannot open table file {}: {}", f.path.display(), err));
+            return Err(format!(
+                "Cannot open table file {}: {}",
+                f.path.display(),
+                err
+            ));
         }
         if f.rows.is_empty() && f.error_count > 0 {
             return Err(format!(
@@ -43,27 +47,28 @@ pub fn read_csv_files(
     // combined: the same physical site would land under two different keys.
     let with_chrom = all_rows.iter().filter(|r| r.chrom.is_some()).count();
     if with_chrom != 0 && with_chrom != all_rows.len() {
-        return Err(
-            "Some table rows carry a 'chrom' column and others do not. \
+        return Err("Some table rows carry a 'chrom' column and others do not. \
              Add the column everywhere, or remove it everywhere."
-                .to_string(),
-        );
+            .to_string());
     }
 
-    let filtered_rows: Vec<TableInputRow> = all_rows.into_iter().filter(|row| {
-        // Validate frequency range
-        if !row.frequency.is_finite() || !(0.0..=1.0).contains(&row.frequency) {
-            out_of_range.fetch_add(1, Ordering::Relaxed);
-            return false;
-        }
-        let depth_ok = row.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
-        let freq_ok = row.frequency >= criteria.min_freq;
-        let alt_reads_ok = row.alt_dp.is_none_or(|ad| ad >= criteria.min_alt_reads);
-        let alt_rev_reads_ok = row
-            .alt_rv
-            .is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
-        depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
-    }).collect();
+    let filtered_rows: Vec<TableInputRow> = all_rows
+        .into_iter()
+        .filter(|row| {
+            // Validate frequency range
+            if !row.frequency.is_finite() || !(0.0..=1.0).contains(&row.frequency) {
+                out_of_range.fetch_add(1, Ordering::Relaxed);
+                return false;
+            }
+            let depth_ok = row.total_dp.is_none_or(|dp| dp >= criteria.min_depth);
+            let freq_ok = row.frequency >= criteria.min_freq;
+            let alt_reads_ok = row.alt_dp.is_none_or(|ad| ad >= criteria.min_alt_reads);
+            let alt_rev_reads_ok = row
+                .alt_rv
+                .is_none_or(|arv| arv >= criteria.min_alt_rev_reads);
+            depth_ok && freq_ok && alt_reads_ok && alt_rev_reads_ok
+        })
+        .collect();
 
     let n = out_of_range.load(Ordering::Relaxed);
     if n > 0 {
@@ -81,7 +86,10 @@ pub fn read_csv_files(
         let gpos = GenomicPos {
             // Rows either all carry a chrom or none do, so this placeholder is
             // applied uniformly and cannot split a site in two.
-            chrom: row.chrom.filter(|c| !c.is_empty()).unwrap_or_else(|| ".".to_string()),
+            chrom: row
+                .chrom
+                .filter(|c| !c.is_empty())
+                .unwrap_or_else(|| ".".to_string()),
             pos: row.position,
         };
         all_positions.insert(gpos.clone());

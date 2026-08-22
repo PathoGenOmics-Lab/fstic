@@ -23,7 +23,12 @@ pub enum InputMode {
 
 /// High-performance pairwise genetic distance calculator from allele-frequency data.
 #[derive(Parser, Debug)]
-#[command(name = "fstic", version, about, author = "Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>")]
+#[command(
+    name = "fstic",
+    version,
+    about,
+    author = "Paula Ruiz-Rodriguez <paula.ruiz.rodriguez@csic.es>"
+)]
 pub struct Args {
     /// One or more input VCF files.
     #[arg(long = "vcf", num_args = 1.., value_name = "VCF_FILES", group = "input")]
@@ -97,7 +102,10 @@ impl Args {
             let files = self.resolve_files(&self.table, &self.table_list)?;
             Ok((InputMode::Table, files))
         } else {
-            Err("No input files provided. Use --vcf, --vcf-list, --table, or --table-list.".to_string())
+            Err(
+                "No input files provided. Use --vcf, --vcf-list, --table, or --table-list."
+                    .to_string(),
+            )
         }
     }
 
