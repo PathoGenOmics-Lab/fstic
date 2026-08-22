@@ -4,5 +4,5 @@
 #
 # mkdocs is pinned below 2.0: it drops the plugin system and theme overrides
 # with no migration path, so Material 9.x will not run on it.
-mkdocs>=1.6,<2
+mkdocs>=1.6.1,<2
 mkdocs-material>=9.6,<10
