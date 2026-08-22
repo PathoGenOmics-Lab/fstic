@@ -41,7 +41,7 @@ jobs:
         # reporting a full set of results.
         shard: [0, 1, 2, 3]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-mutants
@@ -51,7 +51,7 @@ jobs:
         run: cargo mutants --shard ${{ matrix.shard }}/4 --no-shuffle || true
       - name: Upload the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutants-shard-${{ matrix.shard }}
           path: mutants.out/
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: mutants-shard-*
           path: shards
