@@ -1272,9 +1272,11 @@
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Rust version</p>
-<p>The crate uses the 2021 edition and <code>Option::is_none_or</code>, so it needs Rust
-1.82 or newer. <code>rustup update stable</code> if <code>cargo build</code> complains about an
-unstable method.</p>
+<p>Needs Rust <strong>1.85</strong> or newer, which is checked in CI on every pull request.
+The floor comes from the dependency tree rather than from Fstic's own
+source: <code>clap_lex</code> requires edition 2024. On 1.84 the build fails while
+resolving, before it compiles anything.</p>
+<p><code>rustup update stable</code> if <code>cargo build</code> complains about <code>edition2024</code>.</p>
 </div>
 <h2 id="running-the-test-suite">Running the test suite<a class="headerlink" href="#running-the-test-suite" title="Permanent link">&para;</a></h2>
 <p>Worth doing once after building from source, particularly on an unusual

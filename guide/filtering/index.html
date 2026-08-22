@@ -1400,7 +1400,7 @@ is counted and reported at the end.</p>
 <h2 id="missing-fields-do-not-filter">Missing fields do not filter<a class="headerlink" href="#missing-fields-do-not-filter" title="Permanent link">&para;</a></h2>
 <p>A threshold can only be applied to a field that is present. If a VCF has no
 <code>ADR</code>, <code>--min-alt-rev-reads</code> cannot do anything, and the variant is kept:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Warning: VCF file &#39;TB-041.vcf&#39; is missing FORMAT field &#39;ADR&#39;.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Warning: VCF file 'TB-041.vcf' is missing FORMAT field 'ADR'.
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Filtering on this field will be skipped.
 </span></code></pre></div>
 <p>That warning appears once per file per field. <strong>It is worth reading.</strong> A run
@@ -1466,7 +1466,7 @@ is producing frequencies that do not mean what you think.</p>
 means the sample matches the reference everywhere it was called. It keeps its
 row in the matrix and gets a warning:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Warning: TB-093.vcf has no variants left after filtering;
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>&#39;TB-093&#39; is treated as identical to the reference.
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>'TB-093' is treated as identical to the reference.
 </span></code></pre></div>
 <p>If every sample lands there, the run stops with <code>No polymorphic sites found
 after filtering</code>, which almost always means the thresholds are too strict for
