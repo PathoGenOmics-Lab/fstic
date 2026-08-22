@@ -50,10 +50,19 @@ jobs:
       #
       # The update-type test once applied only to ungrouped pull requests,
       # because it was unclear what a grouped one reports. It reports "the
-      # highest semver change being made by this PR", so a group carrying one
-      # major is a major here. That is what lets the coupled npm families in
-      # dependabot.yml hold patches and majors alike without a major slipping
-      # through on the back of a patch.
+      # highest semver change being made by this PR".
+      #
+      # That is not enough on its own, which the first Dependabot run here
+      # showed: indicatif 0.17.9 -> 0.18.6 arrived in the `cargo-major` group
+      # and reported `version-update:semver-minor`, and the two clauses being
+      # ORed meant the minor reading overrode the group. Cargo treats the minor
+      # component as the breaking one below 1.0, so Dependabot grouped it
+      # correctly and `fetch-metadata`, reading the version numbers alone,
+      # called it a minor. It queued itself for merge, and only the repository
+      # having auto-merge switched off stopped it.
+      #
+      # So a `-major` group is a veto rather than an absence of permission. Any
+      # 0.x dependency would otherwise walk through this gate.
       - name: Decide whether this one may merge itself
         id: decide
         env:
@@ -68,6 +77,11 @@ jobs:
           case "$UPDATE_TYPE" in
             version-update:semver-patch|version-update:semver-minor) may_merge=true ;;
           esac
+          # Applied last, and it overrules both: the group name is the reading
+          # that knows about 0.x semantics, and the version numbers are not.
+          case "$GROUP" in
+            *-major) may_merge=false ;;
+          esac
           # Printed because a decision nobody can read is a decision nobody can
           # correct: this line is what a later surprise gets diagnosed from.
           echo "group='${GROUP}' update-type='${UPDATE_TYPE}' -> may-merge=${may_merge}"
@@ -75,7 +89,18 @@ jobs:
 
       - name: Queue the merge
         if: steps.decide.outputs.may-merge == 'true'
-        run: gh pr merge --auto --merge "$PR_URL"
+        run: |
+          set -euo pipefail
+          if ! out=$(gh pr merge --auto --merge "$PR_URL" 2>&1); then
+            echo "$out" >&2
+            # The failure that is a repository setting rather than a fault here.
+            # Said plainly, with the fix, instead of a bare GraphQL error.
+            if echo "$out" | grep -q 'Auto merge is not allowed'; then
+              echo "::error::Auto-merge is switched off for this repository, so routine updates cannot merge themselves. Turn on Settings -> General -> Allow auto-merge."
+            fi
+            exit 1
+          fi
+          echo "$out"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,7 +109,7 @@ jobs:
         if: steps.decide.outputs.may-merge != 'true'
         run: |
           gh pr comment "$PR_URL" --body \
-            "Left for review. Only a \`-routine\` group, or an update that identifies itself as patch or minor, merges on its own once CI passes. This one is a major update or does not say which it is."
+            "Left for review. Only a \`-routine\` group, or an update that identifies itself as patch or minor, merges on its own once CI passes, and never anything in a \`-major\` group. This one is a major update, is grouped as one, or does not say which it is."
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
